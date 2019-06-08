@@ -78,6 +78,7 @@ int main(void)
 
 	std::vector<glm::vec3> position;
 	std::vector<glm::vec3> velocity(BALL_AMOUNT, glm::vec3(0));
+	srand(1145141919810);
 	for (int temp = 0; temp < BALL_AMOUNT; ++temp)
 	{
 		position.push_back(glm::vec3(rand() % 100 / 10.0 - 5, rand() % 100 / 10.0, rand() % 10 - 10));
@@ -98,11 +99,13 @@ int main(void)
 
 		float degree = 0.0f;
 		glm::vec3 object_color{1.0f};
-		srand(1145141919810);
+		static clock_t clockCount;
 		while (!glfwWindowShouldClose(window))
 		{
-			degree += 1.0f;
-			glfwPollEvents();
+			double deltaTime = (double)(clock() - clockCount) / CLOCKS_PER_SEC;
+			clockCount = clock();
+			std::cout << deltaTime << std::endl;
+			degree += 360.0f * deltaTime;
 
 			int display_w, display_h;
 			glfwGetFramebufferSize(window, &display_w, &display_h);
@@ -119,10 +122,12 @@ int main(void)
 			for (int temp = 0; temp < position.size(); ++temp)
 			{
 				if (position[temp].y > -3)
-					velocity[temp].y += 0.0000098f;
+					velocity[temp].y += 9.8f * deltaTime;
 				else
 					velocity[temp] = {0, 0, 0};
-				position[temp] -= velocity[temp];
+				glm::vec3 deltaVelocity = velocity[temp];
+				deltaVelocity *= deltaTime;
+				position[temp] -= deltaVelocity;
 
 				prog["model"] = glm::translate(glm::mat4(1.0f), position[temp]) * glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
 				mesh.draw();
@@ -168,6 +173,7 @@ int main(void)
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 			glfwSwapBuffers(window);
+			glfwPollEvents();
 		}
 	}
 	glfwDestroyWindow(window);
