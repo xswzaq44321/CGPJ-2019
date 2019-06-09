@@ -12,5 +12,8 @@ in vec3 g_normal;
 
 void main()
 {
-    color = vec4(object_color, 1.0)*texture(text, g_uv);
+    vec3 n = normalize(g_normal);
+    n = n * 0.5 + 0.5;
+
+    color = vec4(object_color * n, 1.0);
 }

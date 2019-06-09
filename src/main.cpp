@@ -15,10 +15,13 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_glfw.h"
 #include "WenCheng.h"
+#include "lodepng.h"
+#include <thread>
 #define BALL_AMOUNT 100
 #define PI 3.1415926f
 #define RAD2DEG (180.0f / PI)
 #define DEG2RAD (PI / 180.0f)
+#define GRAVITY 0.98f
 
 static void error_callback(int error, const char *description)
 {
@@ -33,6 +36,11 @@ void assignValue(std::vector<glm::vec3> &pos, int particleNum, float *position)
 		pos[i].y = position[i * 3 + 1];
 		pos[i].z = position[i * 3 + 2];
 	}
+}
+
+void outputPng(const char *filename, std::vector<unsigned char> raw_data, int widht, int height)
+{
+	lodepng::encode(filename, raw_data, widht, height);
 }
 
 int main(void)
@@ -74,7 +82,10 @@ int main(void)
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 	auto text = Texture2D::LoadFromFile("../resource/face.png");
 	auto mesh = StaticMesh::LoadMesh("../resource/sphere.obj");
-	auto prog = Program::LoadFromFile("../resource/vs.vert", "../resource/fs.frag");
+	auto prog = Program::LoadFromFile(
+		"../resource/vs.vert",
+		"../resource/gs.geom",
+		"../resource/fs.frag");
 
 	std::vector<glm::vec3> position;
 	std::vector<glm::vec3> velocity(BALL_AMOUNT, glm::vec3(0));
@@ -100,11 +111,13 @@ int main(void)
 		float degree = 0.0f;
 		glm::vec3 object_color{1.0f};
 		static clock_t clockCount;
+		bool flat_shading = false;
+		glm::vec3 light_pos;
 		while (!glfwWindowShouldClose(window))
 		{
 			double deltaTime = (double)(clock() - clockCount) / CLOCKS_PER_SEC;
 			clockCount = clock();
-			std::cout << deltaTime << std::endl;
+			// std::cout << deltaTime << std::endl;
 			degree += 360.0f * deltaTime;
 
 			int display_w, display_h;
@@ -114,15 +127,20 @@ int main(void)
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			glEnable(GL_DEPTH_TEST);
-			prog["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 1280.0f / 720.0f, 0.1f, 10000.0f) *
+			prog["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 16.0f / 9.0f, 0.1f, 10000.0f) *
 						 glm::lookAt(glm::vec3{0, 0, 10}, glm::vec3{0, 0, 0}, glm::vec3{0, 1, 0});
+			prog["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0));
 			prog["object_color"] = object_color;
-			prog.use();
+			prog["light_pos"] = light_pos;
+			prog["eye_pos"] = glm::vec3{0, 0, 10};
+			prog["text"] = 0;
 			text.bindToChannel(0);
+			prog.use();
+			prog["flat_shading"] = static_cast<int>(flat_shading);
 			for (int temp = 0; temp < position.size(); ++temp)
 			{
 				if (position[temp].y > -3)
-					velocity[temp].y += 9.8f * deltaTime;
+					velocity[temp].y += GRAVITY * deltaTime;
 				else
 					velocity[temp] = {0, 0, 0};
 				glm::vec3 deltaVelocity = velocity[temp];
@@ -134,6 +152,100 @@ int main(void)
 				//Hello World
 			}
 			glDisable(GL_DEPTH_TEST);
+
+			{ // drawing normal map
+
+				static bool once = true;
+				static double timePassed = 0;
+				static std::vector<std::shared_ptr<std::thread>> threadVec;
+				timePassed += deltaTime;
+				if (timePassed > 0.1)
+				{
+					timePassed = 0;
+					GLuint fbo;
+					glGenFramebuffers(1, &fbo);
+					glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+					GLuint texture;
+					glGenTextures(1, &texture);
+					glBindTexture(GL_TEXTURE_2D, texture);
+					glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, display_w, display_h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+					glBindTexture(GL_TEXTURE_2D, 0);
+					glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+
+					GLuint rbo;
+					glGenRenderbuffers(1, &rbo);
+					glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+					glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, display_w, display_h);
+					glBindRenderbuffer(GL_RENDERBUFFER, 0);
+					glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+					if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
+						std::cout << "YES" << std::endl;
+					else
+						std::cout << "CRAP" << std::endl;
+
+					glViewport(0, 0, display_w, display_h);
+					glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+					glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+					glEnable(GL_DEPTH_TEST);
+					auto prog_normal = Program::LoadFromFile(
+						"../resource/vs.vert",
+						"../resource/gs.geom",
+						"../resource/fs_normal.frag");
+					auto gg = Protect(prog_normal);
+
+					prog_normal["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 16.0f / 9.0f, 0.1f, 10000.0f) *
+										glm::lookAt(glm::vec3{0, 0, 10}, glm::vec3{0, 0, 0}, glm::vec3{0, 1, 0});
+					prog_normal["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0));
+					prog_normal["object_color"] = object_color;
+					prog_normal["light_pos"] = light_pos;
+					prog_normal["eye_pos"] = glm::vec3{0, 0, 10};
+					prog_normal["text"] = 0;
+					text.bindToChannel(0);
+					prog_normal.use();
+					prog_normal["flat_shading"] = static_cast<int>(flat_shading);
+					for (int temp = 0; temp < position.size(); ++temp)
+					{
+						if (position[temp].y > -3)
+							velocity[temp].y += GRAVITY * deltaTime;
+						else
+							velocity[temp] = {0, 0, 0};
+						glm::vec3 deltaVelocity = velocity[temp];
+						deltaVelocity *= deltaTime;
+						position[temp] -= deltaVelocity;
+
+						prog_normal["model"] = glm::translate(glm::mat4(1.0f), position[temp]) * glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
+						mesh.draw();
+						//Hello World
+					}
+
+					std::vector<unsigned char> raw_data(display_w * display_h * 4);
+					glReadPixels(0, 0, display_w, display_h, GL_RGBA, GL_UNSIGNED_BYTE, raw_data.data());
+					char temp[100];
+					static int fileCount = 0;
+					sprintf(temp, "normal%d.png", fileCount++);
+
+					threadVec.push_back(std::shared_ptr<std::thread>(new std::thread(outputPng, temp, raw_data, display_w, display_h),
+																	 [](std::thread *ptr) {
+																		 ptr->join();
+																		 std::cout << "Release thread\n";
+																		 delete ptr;
+																	 }));
+					if(threadVec.size() > 10){
+						threadVec.erase(threadVec.begin());
+					}
+					// outputPng(temp, raw_data, display_w, display_h);
+
+					glDisable(GL_DEPTH_TEST);
+
+					glBindFramebuffer(GL_FRAMEBUFFER, 0);
+					glDeleteFramebuffers(1, &fbo);
+					once = false;
+				}
+			}
 
 			// Start the Dear ImGui frame
 			ImGui_ImplOpenGL3_NewFrame();
@@ -155,6 +267,7 @@ int main(void)
 					counter++;
 				ImGui::SameLine();
 				ImGui::Text("counter = %d", counter);
+				ImGui::Checkbox("Flat Shading", &flat_shading);
 				ImGui::Image(reinterpret_cast<ImTextureID>(text.id()), ImVec2{128, 128});
 				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 				// if(ImGui::Button("Reload Shader")) {

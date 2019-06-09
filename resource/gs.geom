@@ -13,8 +13,7 @@ out vec3 g_normal;
 uniform int flat_shading;
 
 void main() {
-    // vec3 flat_normal = normalize(cross(v_position[1]-v_position[0], v_position[2]-v_position[0]));
-    vec3 flat_normal = v_normal[0];
+    vec3 flat_normal = normalize(cross(v_position[1]-v_position[0], v_position[2]-v_position[0]));
 
     gl_Position = gl_in[0].gl_Position;
     g_position = v_position[0];
