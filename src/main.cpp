@@ -16,12 +16,13 @@
 #include "imgui_impl_glfw.h"
 #include "WenCheng.h"
 #include "lodepng.h"
-#include <thread>
+#include <future>
 #define BALL_AMOUNT 100
 #define PI 3.1415926f
 #define RAD2DEG (180.0f / PI)
 #define DEG2RAD (PI / 180.0f)
 #define GRAVITY 0.98f
+#define CREATE_PNG 0
 
 static void error_callback(int error, const char *description)
 {
@@ -43,6 +44,12 @@ void outputPng(const char *filename, std::vector<unsigned char> raw_data, int wi
 	lodepng::encode(filename, raw_data, widht, height);
 }
 
+template <typename T>
+bool future_is_ready(std::future<T> &t)
+{
+	return t.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+}
+
 int main(void)
 {
 	GLFWwindow *window;
@@ -60,7 +67,7 @@ int main(void)
 		exit(EXIT_FAILURE);
 	}
 	glfwMakeContextCurrent(window);
-	// glfwSwapInterval(0);
+	glfwSwapInterval(0);
 	if (!gladLoadGL())
 	{
 		exit(EXIT_FAILURE);
@@ -157,7 +164,9 @@ int main(void)
 
 				static bool once = true;
 				static double timePassed = 0;
-				static std::vector<std::shared_ptr<std::thread>> threadVec;
+				#if CREATE_PNG == 1
+				static std::vector<std::future<void>> threadVec;
+				#endif
 				timePassed += deltaTime;
 				if (timePassed > 0.1)
 				{
@@ -183,19 +192,23 @@ int main(void)
 					glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
 
 					if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
-						std::cout << "YES" << std::endl;
+					{
+						// std::cout << "YES" << std::endl;
+					}
 					else
-						std::cout << "CRAP" << std::endl;
+					{
+						// std::cout << "CRAP" << std::endl;
+					}
 
 					glViewport(0, 0, display_w, display_h);
 					glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
 					glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 					glEnable(GL_DEPTH_TEST);
-					auto prog_normal = Program::LoadFromFile(
+					static auto prog_normal = Program::LoadFromFile(
 						"../resource/vs.vert",
 						"../resource/gs.geom",
 						"../resource/fs_normal.frag");
-					auto gg = Protect(prog_normal);
+					static auto gg = Protect(prog_normal);
 
 					prog_normal["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 16.0f / 9.0f, 0.1f, 10000.0f) *
 										glm::lookAt(glm::vec3{0, 0, 10}, glm::vec3{0, 0, 0}, glm::vec3{0, 1, 0});
@@ -228,15 +241,17 @@ int main(void)
 					static int fileCount = 0;
 					sprintf(temp, "normal%d.png", fileCount++);
 
-					threadVec.push_back(std::shared_ptr<std::thread>(new std::thread(outputPng, temp, raw_data, display_w, display_h),
-																	 [](std::thread *ptr) {
-																		 ptr->join();
-																		 std::cout << "Release thread\n";
-																		 delete ptr;
-																	 }));
-					if(threadVec.size() > 10){
-						threadVec.erase(threadVec.begin());
+					#if CREATE_PNG == 1
+					threadVec.push_back(std::async(std::launch::async, outputPng, temp, raw_data, display_w, display_h));
+					for (int i = 0; i < threadVec.size(); ++i)
+					{
+						if (future_is_ready(threadVec[i]))
+						{
+							threadVec.erase(threadVec.begin() + i);
+							--i;
+						}
 					}
+					#endif
 					// outputPng(temp, raw_data, display_w, display_h);
 
 					glDisable(GL_DEPTH_TEST);
