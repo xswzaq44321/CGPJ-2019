@@ -39,9 +39,13 @@ void assignValue(std::vector<glm::vec3> &pos, int particleNum, float *position)
 	}
 }
 
-void outputPng(const char *filename, std::vector<unsigned char> raw_data, int widht, int height)
+void outputPng(const char *filename, const std::vector<unsigned char> &raw_data, int width, int height)
 {
-	lodepng::encode(filename, raw_data, widht, height);
+	std::vector<unsigned char> raw_data2(width * height * 4);
+	for (int i = 0; i < height; ++i) {
+		std::copy(raw_data.begin() + i * width * 4, raw_data.begin() + (i + 1) * width * 4, raw_data2.begin() + (height - 1 - i) * width * 4);
+	}
+	lodepng::encode(filename, raw_data2, width, height);
 }
 
 template <typename T>
@@ -93,6 +97,7 @@ int main(void)
 		"../resource/vs.vert",
 		"../resource/gs.geom",
 		"../resource/fs.frag");
+	GLuint fbo;
 
 	std::vector<glm::vec3> position;
 	std::vector<glm::vec3> velocity(BALL_AMOUNT, glm::vec3(0));
@@ -116,10 +121,46 @@ int main(void)
 		}
 
 		float degree = 0.0f;
-		glm::vec3 object_color{1.0f};
+		glm::vec3 object_color{ 1.0f };
 		static clock_t clockCount;
 		bool flat_shading = false;
 		glm::vec3 light_pos;
+
+		{
+			glGenFramebuffers(1, &fbo);
+			glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+			GLuint texture;
+			glGenTextures(1, &texture);
+			glBindTexture(GL_TEXTURE_2D, texture);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1280, 720, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glBindTexture(GL_TEXTURE_2D, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+
+			GLuint rbo;
+			glGenRenderbuffers(1, &rbo);
+			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 1280, 720);
+			glBindRenderbuffer(GL_RENDERBUFFER, 0);
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+			if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
+			{
+				// std::cout << "YES" << std::endl;
+			}
+			else
+			{
+				// std::cout << "CRAP" << std::endl;
+			}
+
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
+
+#if CREATE_PNG == 1
+		std::vector<std::future<void>> threadVec;
+#endif
 		while (!glfwWindowShouldClose(window))
 		{
 			double deltaTime = (double)(clock() - clockCount) / CLOCKS_PER_SEC;
@@ -135,11 +176,11 @@ int main(void)
 
 			glEnable(GL_DEPTH_TEST);
 			prog["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 16.0f / 9.0f, 0.1f, 10000.0f) *
-						 glm::lookAt(glm::vec3{0, 0, 10}, glm::vec3{0, 0, 0}, glm::vec3{0, 1, 0});
+				glm::lookAt(glm::vec3{ 0, 0, 10 }, glm::vec3{ 0, 0, 0 }, glm::vec3{ 0, 1, 0 });
 			prog["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0));
 			prog["object_color"] = object_color;
 			prog["light_pos"] = light_pos;
-			prog["eye_pos"] = glm::vec3{0, 0, 10};
+			prog["eye_pos"] = glm::vec3{ 0, 0, 10 };
 			prog["text"] = 0;
 			text.bindToChannel(0);
 			prog.use();
@@ -149,7 +190,7 @@ int main(void)
 				if (position[temp].y > -3)
 					velocity[temp].y += GRAVITY * deltaTime;
 				else
-					velocity[temp] = {0, 0, 0};
+					velocity[temp] = { 0, 0, 0 };
 				glm::vec3 deltaVelocity = velocity[temp];
 				deltaVelocity *= deltaTime;
 				position[temp] -= deltaVelocity;
@@ -164,42 +205,12 @@ int main(void)
 
 				static bool once = true;
 				static double timePassed = 0;
-				#if CREATE_PNG == 1
-				static std::vector<std::future<void>> threadVec;
-				#endif
 				timePassed += deltaTime;
 				if (timePassed > 0.1)
 				{
 					timePassed = 0;
-					GLuint fbo;
-					glGenFramebuffers(1, &fbo);
+
 					glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-
-					GLuint texture;
-					glGenTextures(1, &texture);
-					glBindTexture(GL_TEXTURE_2D, texture);
-					glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, display_w, display_h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-					glBindTexture(GL_TEXTURE_2D, 0);
-					glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
-
-					GLuint rbo;
-					glGenRenderbuffers(1, &rbo);
-					glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-					glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, display_w, display_h);
-					glBindRenderbuffer(GL_RENDERBUFFER, 0);
-					glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-
-					if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
-					{
-						// std::cout << "YES" << std::endl;
-					}
-					else
-					{
-						// std::cout << "CRAP" << std::endl;
-					}
-
 					glViewport(0, 0, display_w, display_h);
 					glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
 					glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -211,11 +222,11 @@ int main(void)
 					static auto gg = Protect(prog_normal);
 
 					prog_normal["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 16.0f / 9.0f, 0.1f, 10000.0f) *
-										glm::lookAt(glm::vec3{0, 0, 10}, glm::vec3{0, 0, 0}, glm::vec3{0, 1, 0});
+						glm::lookAt(glm::vec3{ 0, 0, 10 }, glm::vec3{ 0, 0, 0 }, glm::vec3{ 0, 1, 0 });
 					prog_normal["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0));
 					prog_normal["object_color"] = object_color;
 					prog_normal["light_pos"] = light_pos;
-					prog_normal["eye_pos"] = glm::vec3{0, 0, 10};
+					prog_normal["eye_pos"] = glm::vec3{ 0, 0, 10 };
 					prog_normal["text"] = 0;
 					text.bindToChannel(0);
 					prog_normal.use();
@@ -225,7 +236,7 @@ int main(void)
 						if (position[temp].y > -3)
 							velocity[temp].y += GRAVITY * deltaTime;
 						else
-							velocity[temp] = {0, 0, 0};
+							velocity[temp] = { 0, 0, 0 };
 						glm::vec3 deltaVelocity = velocity[temp];
 						deltaVelocity *= deltaTime;
 						position[temp] -= deltaVelocity;
@@ -237,11 +248,10 @@ int main(void)
 
 					std::vector<unsigned char> raw_data(display_w * display_h * 4);
 					glReadPixels(0, 0, display_w, display_h, GL_RGBA, GL_UNSIGNED_BYTE, raw_data.data());
+#if CREATE_PNG == 1
 					char temp[100];
 					static int fileCount = 0;
 					sprintf(temp, "normal%d.png", fileCount++);
-
-					#if CREATE_PNG == 1
 					threadVec.push_back(std::async(std::launch::async, outputPng, temp, raw_data, display_w, display_h));
 					for (int i = 0; i < threadVec.size(); ++i)
 					{
@@ -251,13 +261,11 @@ int main(void)
 							--i;
 						}
 					}
-					#endif
-					// outputPng(temp, raw_data, display_w, display_h);
+					//outputPng(temp, raw_data, display_w, display_h);
+#endif
 
 					glDisable(GL_DEPTH_TEST);
-
 					glBindFramebuffer(GL_FRAMEBUFFER, 0);
-					glDeleteFramebuffers(1, &fbo);
 					once = false;
 				}
 			}
@@ -283,7 +291,7 @@ int main(void)
 				ImGui::SameLine();
 				ImGui::Text("counter = %d", counter);
 				ImGui::Checkbox("Flat Shading", &flat_shading);
-				ImGui::Image(reinterpret_cast<ImTextureID>(text.id()), ImVec2{128, 128});
+				ImGui::Image(reinterpret_cast<ImTextureID>(text.id()), ImVec2{ 128, 128 });
 				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 				// if(ImGui::Button("Reload Shader")) {
 				//     auto new_prog = Program::LoadFromFile("../resource/vs.vert", "../resource/fs.frag");
@@ -303,6 +311,20 @@ int main(void)
 			glfwSwapBuffers(window);
 			glfwPollEvents();
 		}
+
+#if CREATE_PNG == 1
+		while (threadVec.size() != 0) {
+			for (int i = 0; i < threadVec.size(); ++i)
+			{
+				if (future_is_ready(threadVec[i]))
+				{
+					threadVec.erase(threadVec.begin() + i);
+					--i;
+				}
+			}
+		}
+#endif
+		glDeleteFramebuffers(1, &fbo);
 	}
 	glfwDestroyWindow(window);
 	glfwTerminate();
