@@ -15,5 +15,5 @@ void main()
     vec3 n = normalize(g_normal);
     n = n * 0.5 + 0.5;
 
-    color = vec4(object_color * n, 1.0);
+    color = vec4(n, 1.0);
 }

@@ -17,7 +17,7 @@
 #include "WenCheng.h"
 #include "lodepng.h"
 #include <future>
-#define BALL_AMOUNT 100
+#define BALL_AMOUNT 1000
 #define PI 3.1415926f
 #define RAD2DEG (180.0f / PI)
 #define DEG2RAD (PI / 180.0f)
@@ -94,21 +94,25 @@ int main(void)
 	auto text = Texture2D::LoadFromFile("../resource/face.png");
 	auto mesh = StaticMesh::LoadMesh("../resource/sphere.obj");
 	auto prog = Program::LoadFromFile(
-		"../resource/vs.vert",
+		"../resource/vs_instanced.vert",
 		"../resource/gs.geom",
 		"../resource/fs_light_shad.frag");
 	auto progLight = Program::LoadFromFile(
 		"../resource/vs.vert",
 		"../resource/gs.geom",
 		"../resource/fs_light.frag");
+	auto prog_normal = Program::LoadFromFile(
+		"../resource/vs_instanced.vert",
+		"../resource/gs.geom",
+		"../resource/fs_normal.frag");
 	GLuint fbo;
 
-	std::vector<glm::vec3> position;
+	std::vector<glm::vec3> position(BALL_AMOUNT);
 	std::vector<glm::vec3> velocity(BALL_AMOUNT, glm::vec3(0));
 	srand(1145141919810);
 	for (int temp = 0; temp < BALL_AMOUNT; ++temp)
 	{
-		position.push_back(glm::vec3(rand() % 100 / 10.0 - 5, rand() % 100 / 10.0, rand() % 10 - 10));
+		position[temp] = glm::vec3(rand() / float(RAND_MAX) * 10 - 5, rand() / float(RAND_MAX) * 10, rand() / float(RAND_MAX) * 10 - 10);
 	}
 
 	// Do not remove {}, why???
@@ -117,6 +121,7 @@ int main(void)
 		auto g1 = Protect(text);
 		auto g2 = Protect(mesh);
 		auto g3 = Protect(prog);
+		auto gn = Protect(prog_normal);
 
 		if (!mesh.hasNormal() || !mesh.hasUV())
 		{
@@ -182,15 +187,14 @@ int main(void)
 			glEnable(GL_DEPTH_TEST);
 			prog["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 16.0f / 9.0f, 0.1f, 10000.0f) *
 				glm::lookAt(glm::vec3{ 0, 0, 10 }, glm::vec3{ 0, 0, 0 }, glm::vec3{ 0, 1, 0 });
-			prog["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0));
 			prog["object_color"] = object_color;
 			prog["light_pos"] = light_pos;
 			prog["eye_pos"] = glm::vec3{ 0, 0, 10 };
 			prog["text"] = 0;
 			text.bindToChannel(0);
-			prog.use();
 			prog["flat_shading"] = static_cast<int>(flat_shading);
 			prog["bling_phong"] = static_cast<int>(bling_phong);
+			prog["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
 			for (int temp = 0; temp < position.size(); ++temp)
 			{
 				if (position[temp].y > -3)
@@ -204,10 +208,13 @@ int main(void)
 				deltaVelocity *= deltaTime;
 				position[temp] -= deltaVelocity;
 
-				prog["model"] = glm::translate(glm::mat4(1.0f), position[temp]) * glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
-				mesh.draw();
+				//prog["model"] = glm::translate(glm::mat4(1.0f), position[temp]) * glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
+				//mesh.draw();
 				//Hello World
 			}
+			prog["offsets"] = position;
+			prog.use();
+			mesh.drawInstanced(position.size());
 
 			{
 				progLight["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 16.0f / 9.0f, 0.1f, 10000.0f) *
@@ -235,36 +242,14 @@ int main(void)
 					glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
 					glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 					glEnable(GL_DEPTH_TEST);
-					static auto prog_normal = Program::LoadFromFile(
-						"../resource/vs.vert",
-						"../resource/gs.geom",
-						"../resource/fs_normal.frag");
-					static auto gg = Protect(prog_normal);
 
 					prog_normal["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 16.0f / 9.0f, 0.1f, 10000.0f) *
 						glm::lookAt(glm::vec3{ 0, 0, 10 }, glm::vec3{ 0, 0, 0 }, glm::vec3{ 0, 1, 0 });
-					prog_normal["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0));
-					prog_normal["object_color"] = object_color;
-					prog_normal["light_pos"] = light_pos;
-					prog_normal["eye_pos"] = glm::vec3{ 0, 0, 10 };
-					prog_normal["text"] = 0;
-					text.bindToChannel(0);
-					prog_normal.use();
-					prog_normal["flat_shading"] = static_cast<int>(flat_shading);
-					for (int temp = 0; temp < position.size(); ++temp)
-					{
-						if (position[temp].y > -3)
-							velocity[temp].y += GRAVITY * deltaTime;
-						else
-							velocity[temp] = { 0, 0, 0 };
-						glm::vec3 deltaVelocity = velocity[temp];
-						deltaVelocity *= deltaTime;
-						position[temp] -= deltaVelocity;
+					prog_normal["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
+					prog_normal["offsets"] = position;
 
-						prog_normal["model"] = glm::translate(glm::mat4(1.0f), position[temp]) * glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
-						mesh.draw();
-						//Hello World
-					}
+					prog_normal.use();
+					mesh.drawInstanced(position.size());
 
 					std::vector<unsigned char> raw_data(display_w * display_h * 4);
 					glReadPixels(0, 0, display_w, display_h, GL_RGBA, GL_UNSIGNED_BYTE, raw_data.data());
@@ -280,15 +265,15 @@ int main(void)
 							threadVec.erase(threadVec.begin() + i);
 							--i;
 						}
-					}
+				}
 					//outputPng(temp, raw_data, display_w, display_h);
 #endif
 
 					glDisable(GL_DEPTH_TEST);
 					glBindFramebuffer(GL_FRAMEBUFFER, 0);
 					once = false;
-				}
 			}
+		}
 
 			// Start the Dear ImGui frame
 			ImGui_ImplOpenGL3_NewFrame();
@@ -343,8 +328,8 @@ int main(void)
 					threadVec.erase(threadVec.begin() + i);
 					--i;
 				}
-			}
-		}
+	}
+}
 #endif
 		glDeleteFramebuffers(1, &fbo);
 	}

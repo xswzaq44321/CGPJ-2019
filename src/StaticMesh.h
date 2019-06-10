@@ -10,6 +10,7 @@ public:
 
     static StaticMesh LoadMesh(const std::string &filename);
     void draw();
+	void drawInstanced(int count);
 
 	bool hasNormal() const;
 	bool hasUV() const;

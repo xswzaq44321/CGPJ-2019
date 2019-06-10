@@ -88,6 +88,11 @@ void StaticMesh::draw()
     glDrawElements(GL_TRIANGLES, numIndices, GL_UNSIGNED_INT, nullptr);
 }
 
+void StaticMesh::drawInstanced(int count) {
+	glBindVertexArray(vao);
+	glDrawElementsInstanced(GL_TRIANGLES, numIndices, GL_UNSIGNED_INT, nullptr, count);
+}
+
 bool StaticMesh::hasNormal() const
 {
 	return m_normal;

@@ -6,6 +6,7 @@
 #include <map>
 #include <functional>
 #include <glm/glm.hpp>
+#include <vector>
 
 class UniformVariable
 {
@@ -19,6 +20,7 @@ public:
     glm::uvec2 operator=(const glm::uvec2 &);
     glm::vec2 operator=(const glm::vec2 &);
     glm::vec3 operator=(const glm::vec3 &);
+	std::vector<glm::vec3> operator=(std::vector<glm::vec3> &);
     glm::mat4 operator=(const glm::mat4 &);
     UniformVariable &operator=(const UniformVariable &rhs)=default;
     bool valid() const;

@@ -53,6 +53,12 @@ glm::vec3 UniformVariable::operator=(const glm::vec3 &v)
     glUniform3fv(m_id, 1, glm::value_ptr(v));
     return v;
 }
+std::vector<glm::vec3> UniformVariable::operator=(std::vector<glm::vec3> &v)
+{
+	glUseProgram(m_program);
+	glUniform3fv(m_id, v.size(), reinterpret_cast<GLfloat *>(v.data()));
+	return v;
+}
 
 glm::mat4 UniformVariable::operator=(const glm::mat4 &v)
 {
