@@ -15,7 +15,10 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_glfw.h"
 #include "WenCheng.h"
-#define BALL_AMOUNT 100
+#include "SPHSimulation.cpp"
+#include "particlePlacements.cpp"
+
+#define BALL_AMOUNT s.particleNum
 #define PI 3.1415926f
 #define RAD2DEG (180.0f / PI)
 #define DEG2RAD (PI / 180.0f)
@@ -76,13 +79,44 @@ int main(void)
 	auto mesh = StaticMesh::LoadMesh("../resource/sphere.obj");
 	auto prog = Program::LoadFromFile("../resource/vs.vert", "../resource/fs.frag");
 
+	//For SPH
+	SystemState s;
+	Parameters p;
+	setInitial(centerBox, &s, &p);  // On here, all ball position saved in
+
+	for(int temp = 0;temp < s.particleNum;++temp)
+		std::cout << "\tx = " << s.position[3 * temp + 0] << "\ty = " << s.position[3 * temp + 1] << "\tz = " << s.position[3 * temp + 2] << std::endl;
+
+	getAcceleration(&s, &p);
+	for(int temp = 0;temp < s.particleNum;++temp)
+		std::cout << "\tx = " << s.position[3 * temp + 0] << "\ty = " << s.position[3 * temp + 1] << "\tz = " << s.position[3 * temp + 2] << std::endl;
+
+
+	leapFrogStart(&s, p.timeStep);
+
+	for(int temp2 = 0;temp2 < s.particleNum;++temp2)
+			std::cout << s.vF[3 * temp2 + 0] << "\t" << s.vF[3 * temp2 + 1] << "\t" << s.vF[3 * temp2 + 2] << std::endl;
+
 	std::vector<glm::vec3> position;
 	std::vector<glm::vec3> velocity(BALL_AMOUNT, glm::vec3(0));
-	srand(1145141919810);
+
 	for (int temp = 0; temp < BALL_AMOUNT; ++temp)
 	{
-		position.push_back(glm::vec3(rand() % 100 / 10.0 - 5, rand() % 100 / 10.0, rand() % 10 - 10));
+		//position.push_back(glm::vec3(rand() % 100 / 10.0 - 5, rand() % 100 / 10.0, rand() % 10 - 10));
+		position.push_back(glm::vec3(0, 0, 0));
 	}
+
+	assignValue(position, s.particleNum, s.position);
+
+	// for (int temp = 0; temp < position.size(); ++temp)
+	// {
+	// 	std::cout << "new!==========================";
+	// 	std::cout << "x = " << position[temp].x << "\t";
+	// 	std::cout << "y = " << position[temp].y << "\t";
+	// 	std::cout << "z = " << position[temp].z << "\t\n";
+	// }
+
+	std::cout << BALL_AMOUNT << std::endl;
 
 	// Do not remove {}, why???
 	{
@@ -104,8 +138,19 @@ int main(void)
 		{
 			double deltaTime = (double)(clock() - clockCount) / CLOCKS_PER_SEC;
 			clockCount = clock();
-			std::cout << deltaTime << std::endl;
+			//std::cout << deltaTime << std::endl;
 			degree += 360.0f * deltaTime;
+
+			// SPH SImu testing
+			//getAcceleration(&s, &p);
+
+			for(int temp = 0;temp < p.steps;++temp){
+				//std::cout << "what?" << std::endl;
+				getAcceleration(&s, &p);
+				leapFrogStep(&s, p.timeStep);
+			}
+			assignValue(position, s.particleNum, s.position);
+			/// Till here
 
 			int display_w, display_h;
 			glfwGetFramebufferSize(window, &display_w, &display_h);
@@ -115,19 +160,19 @@ int main(void)
 
 			glEnable(GL_DEPTH_TEST);
 			prog["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 1280.0f / 720.0f, 0.1f, 10000.0f) *
-						 glm::lookAt(glm::vec3{0, 0, 10}, glm::vec3{0, 0, 0}, glm::vec3{0, 1, 0});
+						 glm::lookAt(glm::vec3{0, 5, 20}, glm::vec3{5, 5, 0}, glm::vec3{0, 1, 0});
 			prog["object_color"] = object_color;
 			prog.use();
 			text.bindToChannel(0);
 			for (int temp = 0; temp < position.size(); ++temp)
 			{
-				if (position[temp].y > -3)
-					velocity[temp].y += 9.8f * deltaTime;
-				else
-					velocity[temp] = {0, 0, 0};
-				glm::vec3 deltaVelocity = velocity[temp];
-				deltaVelocity *= deltaTime;
-				position[temp] -= deltaVelocity;
+				// if (position[temp].y > -3)
+				// 	velocity[temp].y += 0.0000001f * deltaTime;
+				// else
+				// 	velocity[temp] = {0, 0, 0};
+				// glm::vec3 deltaVelocity = velocity[temp];
+				// deltaVelocity *= deltaTime;
+				// position[temp] -= deltaVelocity;
 
 				prog["model"] = glm::translate(glm::mat4(1.0f), position[temp]) * glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
 				mesh.draw();
