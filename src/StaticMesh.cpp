@@ -32,6 +32,7 @@ StaticMesh StaticMesh::LoadMesh(const std::string &filename)
 
     glGenBuffers(3, ret.vbo);
     glGenBuffers(1, &ret.ibo);
+	glGenBuffers(1, &ret.instanceVBO);
 
     // Upload postion array
     glBindBuffer(GL_ARRAY_BUFFER, ret.vbo[0]);
@@ -74,12 +75,23 @@ StaticMesh StaticMesh::LoadMesh(const std::string &filename)
     return ret;
 }
 
+void StaticMesh::LoadInstancedArrays(const std::vector<glm::vec3>& v)
+{
+	glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * v.size() , &v[0], GL_STATIC_DRAW);
+
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glVertexAttribDivisor(3, 1);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
 void StaticMesh::release()
 {
     glDeleteVertexArrays(1, &vao);
     glDeleteBuffers(3, vbo);
     glDeleteBuffers(1, &ibo);
-
+	glDeleteBuffers(1, &instanceVBO);
 }
 
 void StaticMesh::draw()

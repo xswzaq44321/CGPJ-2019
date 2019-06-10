@@ -3,12 +3,15 @@
 
 #include <glad/glad.h>
 #include <string>
+#include <glm/glm.hpp>
+#include <vector>
 class StaticMesh {
 public:
     StaticMesh(const StaticMesh &rhs)=default;
     void release();
 
     static StaticMesh LoadMesh(const std::string &filename);
+	void LoadInstancedArrays(const std::vector<glm::vec3> &);
     void draw();
 	void drawInstanced(int count);
 
@@ -21,6 +24,7 @@ private:
     StaticMesh();
     GLuint vao;
     GLuint vbo[3];
+	GLuint instanceVBO = -1;
     GLuint ibo;
     GLuint numIndices;
 

@@ -170,6 +170,7 @@ int main(void)
 
 #if CREATE_PNG == 1
 		std::vector<std::future<void>> threadVec;
+		threadVec.reserve(10);
 #endif
 		while (!glfwWindowShouldClose(window))
 		{
@@ -197,22 +198,17 @@ int main(void)
 			prog["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
 			for (int temp = 0; temp < position.size(); ++temp)
 			{
-				if (position[temp].y > -3)
-					velocity[temp].y += GRAVITY * deltaTime;
-				else
+				velocity[temp].y += GRAVITY * deltaTime;
+				glm::vec3 deltaVelocity = velocity[temp];
+				deltaVelocity *= deltaTime;
+				position[temp] -= deltaVelocity;
+				if (position[temp].y <= -3)
 				{
 					velocity[temp] = { 0, 0, 0 };
 					position[temp].y = -3;
 				}
-				glm::vec3 deltaVelocity = velocity[temp];
-				deltaVelocity *= deltaTime;
-				position[temp] -= deltaVelocity;
-
-				//prog["model"] = glm::translate(glm::mat4(1.0f), position[temp]) * glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
-				//mesh.draw();
-				//Hello World
 			}
-			prog["offsets"] = position;
+			mesh.LoadInstancedArrays(position);
 			prog.use();
 			mesh.drawInstanced(position.size());
 
@@ -265,15 +261,14 @@ int main(void)
 							threadVec.erase(threadVec.begin() + i);
 							--i;
 						}
-				}
-					//outputPng(temp, raw_data, display_w, display_h);
+					}
 #endif
 
 					glDisable(GL_DEPTH_TEST);
 					glBindFramebuffer(GL_FRAMEBUFFER, 0);
 					once = false;
+				}
 			}
-		}
 
 			// Start the Dear ImGui frame
 			ImGui_ImplOpenGL3_NewFrame();
@@ -328,8 +323,8 @@ int main(void)
 					threadVec.erase(threadVec.begin() + i);
 					--i;
 				}
-	}
-}
+			}
+		}
 #endif
 		glDeleteFramebuffers(1, &fbo);
 	}
