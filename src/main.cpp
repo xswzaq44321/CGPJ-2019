@@ -96,7 +96,11 @@ int main(void)
 	auto prog = Program::LoadFromFile(
 		"../resource/vs.vert",
 		"../resource/gs.geom",
-		"../resource/fs.frag");
+		"../resource/fs_light_shad.frag");
+	auto progLight = Program::LoadFromFile(
+		"../resource/vs.vert",
+		"../resource/gs.geom",
+		"../resource/fs_light.frag");
 	GLuint fbo;
 
 	std::vector<glm::vec3> position;
@@ -124,6 +128,7 @@ int main(void)
 		glm::vec3 object_color{ 1.0f };
 		static clock_t clockCount;
 		bool flat_shading = false;
+		bool bling_phong = false;
 		glm::vec3 light_pos;
 
 		{
@@ -185,12 +190,16 @@ int main(void)
 			text.bindToChannel(0);
 			prog.use();
 			prog["flat_shading"] = static_cast<int>(flat_shading);
+			prog["bling_phong"] = static_cast<int>(bling_phong);
 			for (int temp = 0; temp < position.size(); ++temp)
 			{
 				if (position[temp].y > -3)
 					velocity[temp].y += GRAVITY * deltaTime;
 				else
+				{
 					velocity[temp] = { 0, 0, 0 };
+					position[temp].y = -3;
+				}
 				glm::vec3 deltaVelocity = velocity[temp];
 				deltaVelocity *= deltaTime;
 				position[temp] -= deltaVelocity;
@@ -199,6 +208,17 @@ int main(void)
 				mesh.draw();
 				//Hello World
 			}
+
+			{
+				progLight["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 16.0f / 9.0f, 0.1f, 10000.0f) *
+					glm::lookAt(glm::vec3{ 0, 0, 10 }, glm::vec3{ 0, 0, 0 }, glm::vec3{ 0, 1, 0 });
+				// point light
+				progLight["model"] = glm::translate(glm::mat4(1.0f), light_pos) * glm::scale(glm::mat4(1.0f), glm::vec3{ 0.2f });
+
+				progLight.use();
+				mesh.draw();
+			}
+
 			glDisable(GL_DEPTH_TEST);
 
 			{ // drawing normal map
@@ -285,12 +305,14 @@ int main(void)
 				ImGui::SliderFloat("degree", &degree, 0.0f, 360.0f);			 // Edit 1 float using a slider from 0.0f to 1.0f
 				ImGui::ColorEdit3("clear color", (float *)&clear_color);		 // Edit 3 floats representing a color
 				ImGui::ColorEdit3("object color", glm::value_ptr(object_color)); // Edit 3 floats representing a color
+				ImGui::SliderFloat3("Position", glm::value_ptr(light_pos), -10, 10);
 
 				if (ImGui::Button("Button")) // Buttons return true when clicked (most widgets return true when edited/activated)
 					counter++;
 				ImGui::SameLine();
 				ImGui::Text("counter = %d", counter);
 				ImGui::Checkbox("Flat Shading", &flat_shading);
+				ImGui::Checkbox("Bling Phong", &bling_phong);
 				ImGui::Image(reinterpret_cast<ImTextureID>(text.id()), ImVec2{ 128, 128 });
 				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 				// if(ImGui::Button("Reload Shader")) {
