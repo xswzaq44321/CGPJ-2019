@@ -17,7 +17,7 @@
 #include "WenCheng.h"
 #include "lodepng.h"
 #include <future>
-#define BALL_AMOUNT 1000
+#define BALL_AMOUNT 10000
 #define PI 3.1415926f
 #define RAD2DEG (180.0f / PI)
 #define DEG2RAD (PI / 180.0f)
@@ -105,6 +105,10 @@ int main(void)
 		"../resource/vs_instanced.vert",
 		"../resource/gs.geom",
 		"../resource/fs_normal.frag");
+	auto prog_depth = Program::LoadFromFile(
+		"../resource/vs_instanced.vert",
+		"../resource/gs.geom",
+		"../resource/fs_depth.frag");
 	GLuint fbo;
 
 	std::vector<glm::vec3> position(BALL_AMOUNT);
@@ -122,6 +126,7 @@ int main(void)
 		auto g2 = Protect(mesh);
 		auto g3 = Protect(prog);
 		auto gn = Protect(prog_normal);
+		auto gd = Protect(prog_depth);
 
 		if (!mesh.hasNormal() || !mesh.hasUV())
 		{
@@ -181,11 +186,13 @@ int main(void)
 
 			int display_w, display_h;
 			glfwGetFramebufferSize(window, &display_w, &display_h);
+			static std::vector<unsigned char> raw_data_normal(display_w * display_h * 4);
+			static std::vector<unsigned char> raw_data_depth(display_w * display_h * 4);
 			glViewport(0, 0, display_w, display_h);
+			glEnable(GL_DEPTH_TEST);
+
 			glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-			glEnable(GL_DEPTH_TEST);
 			prog["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 16.0f / 9.0f, 0.1f, 10000.0f) *
 				glm::lookAt(glm::vec3{ 0, 0, 10 }, glm::vec3{ 0, 0, 0 }, glm::vec3{ 0, 1, 0 });
 			prog["object_color"] = object_color;
@@ -225,35 +232,49 @@ int main(void)
 			glDisable(GL_DEPTH_TEST);
 
 			{ // drawing normal map
+				glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+				glViewport(0, 0, display_w, display_h);
+				glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+				glEnable(GL_DEPTH_TEST);
 
-				static bool once = true;
+				prog_normal["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 16.0f / 9.0f, 0.1f, 10000.0f) *
+					glm::lookAt(glm::vec3{ 0, 0, 10 }, glm::vec3{ 0, 0, 0 }, glm::vec3{ 0, 1, 0 });
+				prog_normal["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
+
+				prog_normal.use();
+				mesh.drawInstanced(position.size());
+
+				// make sure vector have enouth space to store
+				raw_data_normal.reserve(display_w * display_h * 4);
+				glReadPixels(0, 0, display_w, display_h, GL_RGBA, GL_UNSIGNED_BYTE, raw_data_normal.data());
+
+				glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+				prog_depth["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 16.0f / 9.0f, 0.1f, 10000.0f) *
+					glm::lookAt(glm::vec3{ 0, 0, 10 }, glm::vec3{ 0, 0, 0 }, glm::vec3{ 0, 1, 0 });
+				prog_depth["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
+
+				prog_depth.use();
+				mesh.drawInstanced(position.size());
+
+				raw_data_depth.reserve(display_w * display_h * 4);
+				glReadPixels(0, 0, display_w, display_h, GL_RGBA, GL_UNSIGNED_BYTE, raw_data_depth.data());
+
+				glDisable(GL_DEPTH_TEST);
+				glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+#if CREATE_PNG == 1
 				static double timePassed = 0;
 				timePassed += deltaTime;
-				if (timePassed > 0.1)
+				if (timePassed > 1)
 				{
 					timePassed = 0;
 
-					glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-					glViewport(0, 0, display_w, display_h);
-					glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-					glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-					glEnable(GL_DEPTH_TEST);
-
-					prog_normal["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 16.0f / 9.0f, 0.1f, 10000.0f) *
-						glm::lookAt(glm::vec3{ 0, 0, 10 }, glm::vec3{ 0, 0, 0 }, glm::vec3{ 0, 1, 0 });
-					prog_normal["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
-					prog_normal["offsets"] = position;
-
-					prog_normal.use();
-					mesh.drawInstanced(position.size());
-
-					std::vector<unsigned char> raw_data(display_w * display_h * 4);
-					glReadPixels(0, 0, display_w, display_h, GL_RGBA, GL_UNSIGNED_BYTE, raw_data.data());
-#if CREATE_PNG == 1
 					char temp[100];
 					static int fileCount = 0;
-					sprintf(temp, "normal%d.png", fileCount++);
-					threadVec.push_back(std::async(std::launch::async, outputPng, temp, raw_data, display_w, display_h));
+					sprintf(temp, "maps/normal%d.png", fileCount);
+					threadVec.push_back(std::async(std::launch::async, outputPng, temp, raw_data_normal, display_w, display_h));
 					for (int i = 0; i < threadVec.size(); ++i)
 					{
 						if (future_is_ready(threadVec[i]))
@@ -262,12 +283,19 @@ int main(void)
 							--i;
 						}
 					}
-#endif
-
-					glDisable(GL_DEPTH_TEST);
-					glBindFramebuffer(GL_FRAMEBUFFER, 0);
-					once = false;
+					char temp2[100];
+					sprintf(temp2, "maps/depth%d.png", fileCount++);
+					threadVec.push_back(std::async(std::launch::async, outputPng, temp2, raw_data_depth, display_w, display_h));
+					for (int i = 0; i < threadVec.size(); ++i)
+					{
+						if (future_is_ready(threadVec[i]))
+						{
+							threadVec.erase(threadVec.begin() + i);
+							--i;
+						}
+					}
 				}
+#endif // CREATE_PNG
 			}
 
 			// Start the Dear ImGui frame
