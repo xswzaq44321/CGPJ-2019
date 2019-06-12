@@ -17,8 +17,8 @@
 #include "WenCheng.h"
 #include "lodepng.h"
 #include <future>
-#include "SPHSimulation_2.cpp"
-#include "particlePlacements.cpp"
+#include "SPHSimulation_2.h"
+#include "particlePlacements.h"
 #define BALL_AMOUNT s.particleNum
 #define PI 3.1415926f
 #define RAD2DEG (180.0f / PI)
