@@ -77,11 +77,11 @@ void setInitial(std::function<int(float, float, float)> initialPosFunc,
 void setInitial(std::function<int(float, float, float)> initialPosFunc, SystemState* s, Parameters* p){
 	s->particleMass = 1.0f;
 	p->steps = 5;
-	p->radii = 0.9f;
+	p->radii = 0.35f;
 	p->timeStep = 0.0025f;
 	p->referenceDensity = 1000.0f;
 	p->bulkModules = 1000.0f;
-	p->viscosity = 0.1f;
+	p->viscosity = 1000.0f;
 	p->gravity = 9.8f;
 
 
@@ -96,7 +96,7 @@ void setInitial(std::function<int(float, float, float)> initialPosFunc, SystemSt
 
 void setPosition(std::function<int(float, float, float)> initialPosFunc, SystemState* s, Parameters* p){
 	int count = 0;
-	float gap = p->radii * 1.8f;
+	float gap = p->radii / 1.3f;
 	for(float x = 0.0f;x < 10.0f;x += gap){
 		for(float y = 0.0f;y < 10.0f;y += gap){
 			for(float z = 0.0f;z < 10.0f;z += gap){
@@ -137,8 +137,8 @@ void getDensity(SystemState *s, Parameters *p)
 
 	float rp2 = r * r;
 	float rp8 = (rp2 * rp2) * (rp2 * rp2);
-	const float C = 4.0f * s->particleMass / PI / rp8;
-	const float BASE = 4.0 * s->particleMass / PI / rp2;
+	const float C = 315.0f * s->particleMass / PI / rp8 / r / 64;
+	const float BASE = 315.0 * s->particleMass / PI / rp2 / r;
 
 	
 
@@ -188,7 +188,7 @@ void getAcceleration(SystemState* s, Parameters* p){
 
 
 	// Constants
-	float C0 = mass / PI / (rp2 * rp2);
+	float C0 = mass * 945 / 24 / PI / ((rp2 * rp2) * r) / 32;
 	float Cp = 15 * k;
 	float Cv = -40 * viscosity;
 
@@ -196,7 +196,7 @@ void getAcceleration(SystemState* s, Parameters* p){
 	for(int temp = 0;temp < particleNum;++temp){
 		acceleration[3 * temp + 0] = 0.0f;
 		acceleration[3 * temp + 1] = -gravity;
-		acceleration[3 * temp + 2] = -2.0f;
+		acceleration[3 * temp + 2] = 0.0f;
 	}
 
 	float dx;
@@ -231,12 +231,12 @@ void getAcceleration(SystemState* s, Parameters* p){
 				dvx = velocity[3 * temp + 0] - velocity[3 * temp2 + 0];
 				dvy = velocity[3 * temp + 1] - velocity[3 * temp2 + 1];
 				dvz = velocity[3 * temp + 2] - velocity[3 * temp2 + 2];
-				// acceleration[3 * temp + 0] += (wp * dx + wv * dvx);
+				acceleration[3 * temp + 0] += (wp * dx + wv * dvx);
 				acceleration[3 * temp + 1] += (wp * dy + wv * dvy);
-				// acceleration[3 * temp + 2] += (wp * dz + wv * dvz);
-				// acceleration[3 * temp2 + 0] -= (wp * dx + wv * dvx);
+				acceleration[3 * temp + 2] += (wp * dz + wv * dvz);
+				acceleration[3 * temp2 + 0] -= (wp * dx + wv * dvx);
 				acceleration[3 * temp2 + 1] -= (wp * dy + wv * dvy);
-				// acceleration[3 * temp2 + 2] -= (wp * dz + wv * dvz);
+				acceleration[3 * temp2 + 2] -= (wp * dz + wv * dvz);
 			}
 		}
 	}
@@ -246,6 +246,10 @@ void getAcceleration(SystemState* s, Parameters* p){
 	// 				 "\ta-y = " << s->acceleration[3 * temp + 1] << 
 	// 				 "\ta-z = " << s->acceleration[3 * temp + 2] << std::endl;
 }
+
+
+
+// The following equations has no issue.
 
 void leapFrogStart(SystemState* s, double timeStep){
 	for(int temp = 0;temp < 3 * s->particleNum;++temp)
@@ -285,7 +289,7 @@ void reflectCheck(SystemState* s){
 
 	for(int temp = 0;temp < s->particleNum;++temp, position += 3, vF += 3, vH += 3){
 		if(position[0] < XMIN) reflect(0, XMIN, position, vF, vH);
-		if(position[0] > XMAX) reflect(0, XMIN, position, vF, vH);
+		if(position[0] > XMAX) reflect(0, XMAX, position, vF, vH);
 		if(position[1] < YMIN) reflect(1, YMIN, position, vF, vH);
 		if(position[1] > YMAX) reflect(1, YMAX, position, vF, vH);
 		if(position[2] < ZMIN) reflect(2, ZMIN, position, vF, vH);
@@ -297,8 +301,8 @@ void reflectCheck(SystemState* s){
 void reflect(int axisIndex, float barrier, float* position, float* vF, float* vH){
 	// Evergy lost rate when touched the wall
 	//std::cout << "No I sudn't" << std::endl;
-	std::cout << "\n" << axisIndex << "\t" << barrier;
-	const float LOSS = 0.02f;
+	//std::cout << "\n" << axisIndex << "\t" << barrier;
+	const float LOSS = 0.25f;
 
 	// Ignoring
 	if (vF[axisIndex] == 0)

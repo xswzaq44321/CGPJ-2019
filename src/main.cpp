@@ -15,7 +15,7 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_glfw.h"
 #include "WenCheng.h"
-#include "SPHSimulation.cpp"
+#include "SPHSimulation_2.cpp"
 #include "particlePlacements.cpp"
 
 #define BALL_AMOUNT s.particleNum
@@ -78,24 +78,23 @@ int main(void)
 	auto text = Texture2D::LoadFromFile("../resource/face.png");
 	auto mesh = StaticMesh::LoadMesh("../resource/sphere.obj");
 	auto prog = Program::LoadFromFile("../resource/vs.vert", "../resource/fs.frag");
-
 	//For SPH
 	SystemState s;
-	Parameters p;
-	setInitial(centerBox, &s, &p);  // On here, all ball position saved in
+	setInitial(centerBox, &s);  // On here, all ball position saved in
+	// for(int temp = 0;temp < s.particleNum;++temp)
+	// 	std::cout << "\tx = " << s.position[3 * temp + 0] << "\ty = " << s.position[3 * temp + 1] << "\tz = " << s.position[3 * temp + 2] << std::endl;
+	// for(int temp = 0;temp < s.particleNum;++temp)
+	// 	std::cout << "\tx = " << s.position[3 * temp + 0] << "\ty = " << s.position[3 * temp + 1] << "\tz = " << s.position[3 * temp + 2] << std::endl;
 
-	for(int temp = 0;temp < s.particleNum;++temp)
-		std::cout << "\tx = " << s.position[3 * temp + 0] << "\ty = " << s.position[3 * temp + 1] << "\tz = " << s.position[3 * temp + 2] << std::endl;
+	std::cout << "dick";
+	getAcceleration(&s);
+	// for(int temp = 0;temp < s.particleNum;++temp)
+	// 	std::cout << "\tx = " << s.position[3 * temp + 0] << "\ty = " << s.position[3 * temp + 1] << "\tz = " << s.position[3 * temp + 2] << std::endl;
 
-	getAcceleration(&s, &p);
-	for(int temp = 0;temp < s.particleNum;++temp)
-		std::cout << "\tx = " << s.position[3 * temp + 0] << "\ty = " << s.position[3 * temp + 1] << "\tz = " << s.position[3 * temp + 2] << std::endl;
+	leapFrogStart(&s, Params::timeStep);
 
-
-	leapFrogStart(&s, p.timeStep);
-
-	for(int temp2 = 0;temp2 < s.particleNum;++temp2)
-			std::cout << s.vF[3 * temp2 + 0] << "\t" << s.vF[3 * temp2 + 1] << "\t" << s.vF[3 * temp2 + 2] << std::endl;
+	// for(int temp2 = 0;temp2 < s.particleNum;++temp2)
+	// 		std::cout << s.vF[3 * temp2 + 0] << "\t" << s.vF[3 * temp2 + 1] << "\t" << s.vF[3 * temp2 + 2] << std::endl;
 
 	std::vector<glm::vec3> position;
 	std::vector<glm::vec3> velocity(BALL_AMOUNT, glm::vec3(0));
@@ -139,17 +138,23 @@ int main(void)
 			double deltaTime = (double)(clock() - clockCount) / CLOCKS_PER_SEC;
 			clockCount = clock();
 			//std::cout << deltaTime << std::endl;
-			degree += 360.0f * deltaTime;
+			degree += 0;//360.0f * deltaTime;
 
 			// SPH SImu testing
 			//getAcceleration(&s, &p);
 
-			for(int temp = 0;temp < p.steps;++temp){
+			for(int temp = 0;temp < Params::steps;++temp){
 				//std::cout << "what?" << std::endl;
-				getAcceleration(&s, &p);
-				leapFrogStep(&s, p.timeStep);
+				getAcceleration(&s);
+				leapFrogStep(&s, Params::timeStep);
+
 			}
 			assignValue(position, s.particleNum, s.position);
+
+			// for(glm::vec3 temp : position)
+			// {
+			// 	std::cout << "x = " << temp.x << ",   y = " << temp.y << ",   z = " << temp.z << std::endl;
+			// }
 			/// Till here
 
 			int display_w, display_h;
@@ -160,7 +165,7 @@ int main(void)
 
 			glEnable(GL_DEPTH_TEST);
 			prog["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 1280.0f / 720.0f, 0.1f, 10000.0f) *
-						 glm::lookAt(glm::vec3{0, 5, 20}, glm::vec3{5, 5, 0}, glm::vec3{0, 1, 0});
+						 glm::lookAt(glm::vec3{30, 10, 23}, glm::vec3{0, 5, 0}, glm::vec3{0, 1, 0});
 			prog["object_color"] = object_color;
 			prog.use();
 			text.bindToChannel(0);
