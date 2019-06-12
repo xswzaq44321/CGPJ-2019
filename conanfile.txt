@@ -4,6 +4,7 @@ glfw/3.2.1@bincrafters/stable
 glad/0.1.24@bincrafters/stable
 glm/0.9.8.5@bincrafters/stable
 fmt/5.3.0@bincrafters/stable
+opencv/4.0.1@conan/stable
 
 [generators]
 cmake

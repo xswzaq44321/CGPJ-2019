@@ -8,31 +8,26 @@ pip3 install conan
 ```
 3. download package
 ```bash
-mkdir build && cd build
+mkdir build
+cd build
 conan remote add bincrafters https://api.bintray.com/conan/bincrafters/public-conan
-conan install opencv/4.0.1@conan/stable
-```
-
-在conanfile.txt裡面加上
-[requires]
-opencv/4.0.1@conan/stable
-
-```bash
 conan install .. --build glad -sbuild_type=Debug
+conan install opencv/4.0.1@conan/stable
 ```
 
 ## Configure
 ```bash
-cd build
+# under bulild folder
 cmake .. -G "Visual Studio 15 2017 Win64"
 ```
 
 ## Build
 ```bash
-cd build
+# under bulild folder
 cmake --build .
 ```
 
 ## Thirdparty
 1. GLFW3
 2. ImGui
+
