@@ -17,7 +17,9 @@
 #include "WenCheng.h"
 #include "lodepng.h"
 #include <future>
-#define BALL_AMOUNT 10000
+#include "SPHSimulation_2.cpp"
+#include "particlePlacements.cpp"
+#define BALL_AMOUNT s.particleNum
 #define PI 3.1415926f
 #define RAD2DEG (180.0f / PI)
 #define DEG2RAD (PI / 180.0f)
@@ -110,14 +112,16 @@ int main(void)
 		"../resource/gs.geom",
 		"../resource/fs_depth.frag");
 	GLuint fbo;
+	SystemState s;
+	setInitial(centerBox, &s);  // On here, all ball position saved in
+	getAcceleration(&s);
+	leapFrogStart(&s, Params::timeStep);
 
-	std::vector<glm::vec3> position(BALL_AMOUNT);
-	std::vector<glm::vec3> velocity(BALL_AMOUNT, glm::vec3(0));
-	srand(1145141919810);
-	for (int temp = 0; temp < BALL_AMOUNT; ++temp)
-	{
-		position[temp] = glm::vec3(rand() / float(RAND_MAX) * 10 - 5, rand() / float(RAND_MAX) * 10, rand() / float(RAND_MAX) * 10 - 10);
-	}
+	std::vector<glm::vec3> position(BALL_AMOUNT, glm::vec3(0));
+
+	assignValue(position, s.particleNum, s.position);
+
+	std::cout << BALL_AMOUNT << std::endl;
 
 	// Do not remove {}, why???
 	{
@@ -182,7 +186,13 @@ int main(void)
 			double deltaTime = (double)(clock() - clockCount) / CLOCKS_PER_SEC;
 			clockCount = clock();
 			// std::cout << deltaTime << std::endl;
-			degree += 360.0f * deltaTime;
+			degree += 0;
+			for(int temp = 0;temp < Params::steps;++temp){
+				getAcceleration(&s);
+				leapFrogStep(&s, Params::timeStep);
+
+			}
+			assignValue(position, s.particleNum, s.position);
 
 			int display_w, display_h;
 			glfwGetFramebufferSize(window, &display_w, &display_h);
@@ -193,8 +203,10 @@ int main(void)
 
 			glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			prog["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 16.0f / 9.0f, 0.1f, 10000.0f) *
-				glm::lookAt(glm::vec3{ 0, 0, 10 }, glm::vec3{ 0, 0, 0 }, glm::vec3{ 0, 1, 0 });
+
+			glEnable(GL_DEPTH_TEST);
+			prog["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 1280.0f / 720.0f, 0.1f, 10000.0f) *
+						 glm::lookAt(glm::vec3{30, 10, 23}, glm::vec3{0, 5, 0}, glm::vec3{0, 1, 0});
 			prog["object_color"] = object_color;
 			prog["light_pos"] = light_pos;
 			prog["eye_pos"] = glm::vec3{ 0, 0, 10 };
@@ -203,18 +215,7 @@ int main(void)
 			prog["flat_shading"] = static_cast<int>(flat_shading);
 			prog["bling_phong"] = static_cast<int>(bling_phong);
 			prog["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
-			for (int temp = 0; temp < position.size(); ++temp)
-			{
-				velocity[temp].y += GRAVITY * deltaTime;
-				glm::vec3 deltaVelocity = velocity[temp];
-				deltaVelocity *= deltaTime;
-				position[temp] -= deltaVelocity;
-				if (position[temp].y <= -3)
-				{
-					velocity[temp] = { 0, 0, 0 };
-					position[temp].y = -3;
-				}
-			}
+
 			mesh.LoadInstancedArrays(position);
 			prog.use();
 			mesh.drawInstanced(position.size());
