@@ -23,13 +23,13 @@ public:
 class Params{
 public:
 	static constexpr float gravity = 9.8f;	// 
-	static constexpr float Cs = 3.0f;		// Speed of sound
-	static constexpr float Cij = 300.0f;		// Strength of interaction force
+	static constexpr float Cs = 10.0f;		// Speed of sound
+	static constexpr float Cij = 5.0f;		// Strength of interaction force
 	static constexpr float k = 1.38672255f;	// Constant used to calculate interaction force
 	static constexpr float viscosity = 0.1f;  // Viscosity == mu
 	static constexpr float mass = 1.0f;		// Mass of each particle (Assume each particle is same)
-	static constexpr float radii = 0.55f; 			// Radii (radius of affect)
-	static constexpr float rDensity = 1.0f;		// Refrence Density
+	static constexpr float radii = 0.75f; 			// Radii (radius of affect)
+	static constexpr float rDensity = 3.0f;		// Refrence Density
 
 	static constexpr int steps = 5;				// Amount of steps used in Leap From Integration
 	static constexpr float timeStep = 0.0075f;	// Time of each Half-Step
@@ -284,12 +284,12 @@ void getInteractiveAcc(SystemState* s){
 			R = getVecDistance(position, temp, temp2);
 			r = sqrt(getSqrDistance(position, temp, temp2));
 
-			a[3 * temp + 0] -= C * Force(r) * R[0];
-			a[3 * temp + 1] -= C * Force(r) * R[1];
-			a[3 * temp + 2] -= C * Force(r) * R[2];
-			a[3 * temp2 + 0] += C * Force(r) * R[0];
-			a[3 * temp2 + 1] += C * Force(r) * R[1];
-			a[3 * temp2 + 2] += C * Force(r) * R[2];
+			a[3 * temp + 0] += C * Force(r) * R[0];
+			a[3 * temp + 1] += C * Force(r) * R[1];
+			a[3 * temp + 2] += C * Force(r) * R[2];
+			a[3 * temp2 + 0] -= C * Force(r) * R[0];
+			a[3 * temp2 + 1] -= C * Force(r) * R[1];
+			a[3 * temp2 + 2] -= C * Force(r) * R[2];
 		}
 	}
 }
