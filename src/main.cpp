@@ -206,7 +206,7 @@ int main(void)
 
 			glEnable(GL_DEPTH_TEST);
 			prog["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 1280.0f / 720.0f, 0.1f, 10000.0f) *
-						 glm::lookAt(glm::vec3{30, 10, 23}, glm::vec3{0, 5, 0}, glm::vec3{0, 1, 0});
+						 glm::lookAt(glm::vec3{-15, 10, -13}, glm::vec3{0, 5, 0}, glm::vec3{0, 1, 0});
 			prog["object_color"] = object_color;
 			prog["light_pos"] = light_pos;
 			prog["eye_pos"] = glm::vec3{ 0, 0, 10 };

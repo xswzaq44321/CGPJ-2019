@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstring>
 #include <functional>
+#include <thread>
 
 #define PI 3.1415926f
 
@@ -23,16 +24,30 @@ public:
 class Params{
 public:
 	static constexpr float gravity = 9.8f;	// 
-	static constexpr float Cs = 3.0f;		// Speed of sound
-	static constexpr float Cij = 300.0f;		// Strength of interaction force
+	static constexpr float Cs = 10.0f;		// Speed of sound
+	static constexpr float Cij = 10.0f;		// Strength of interaction force
 	static constexpr float k = 1.38672255f;	// Constant used to calculate interaction force
-	static constexpr float viscosity = 0.1f;  // Viscosity == mu
+	static constexpr float viscosity = 1.0f;  // Viscosity == mu
 	static constexpr float mass = 1.0f;		// Mass of each particle (Assume each particle is same)
-	static constexpr float radii = 0.55f; 			// Radii (radius of affect)
-	static constexpr float rDensity = 1.0f;		// Refrence Density
+	static constexpr float radii = 0.75f; 			// Radii (radius of affect)
+	static constexpr float rDensity = 3.0f;		// Refrence Density
 
 	static constexpr int steps = 5;				// Amount of steps used in Leap From Integration
-	static constexpr float timeStep = 0.0075f;	// Time of each Half-Step
+	static constexpr float timeStep = 0.005f;	// Time of each Half-Step
+	static constexpr float XMIN = 0.0f;
+	static constexpr float XMAX = 10.0f;
+	static constexpr float YMIN = 0.0f;
+	static constexpr float YMAX = 10.0f;
+	static constexpr float ZMIN = 0.0f;
+	static constexpr float ZMAX = 10.0f;
+
+	static constexpr float LOSS = 0.25;
+	static constexpr float Cpv = -945 / (32 * PI * (radii * radii * radii) * (radii * radii * radii) * (radii * radii * radii));
+	static constexpr float Cv = viscosity * mass;
+	static constexpr float Ci = -Cij * mass * mass;
+	static constexpr float Cdb = 315 / (64 * PI * (radii * radii * radii));
+	static constexpr float Cd = 315 / (64 * PI * (radii * radii * radii) * (radii * radii * radii) * (radii * radii * radii));
+	static constexpr float Cf = cos(3 * PI / (2 * k * radii));
 };
 
 // Functions for initialization
@@ -49,17 +64,15 @@ void reflect(int axisIndex, float barrier, float* position, float* vF, float* vH
 void getAcceleration(SystemState* s);
 float getSqrDistance(float* position, int m, int n);
 std::vector<float> getVecDistance(float* position, int m, int n);
-void getPressureAcc(SystemState* s);
+void getPressureAcc(SystemState* s, float* a);
 void getDensity(SystemState* s);
 void getPressure(SystemState* s);
-void getViscosityAcc(SystemState* s);
-void getInteractiveAcc(SystemState* s);
-float Force(float r);
+void getViscosityAcc(SystemState* s, float* a);
+void getInteractiveAcc(SystemState* s, float* a);
 
 void setInitial(std::function<int(float, float, float)> initialPosFunc, SystemState* s){
 	setPosition(initialPosFunc, s);
 
-	//s->position = new float[3 * s->particleNum];
 	s->vH =  new float[3 * s->particleNum];
 	s->vF =  new float[3 * s->particleNum];
 	s->acceleration =  new float[3 * s->particleNum];
@@ -112,11 +125,6 @@ void setPosition(std::function<int(float, float, float)> initialPosFunc, SystemS
 void getAcceleration(SystemState* s){
 
 	// Acceleration of gravity, base.
-	for(int temp = 0;temp < s->particleNum;++temp){
-		s->acceleration[3 * temp + 0] = 0.0f;
-		s->acceleration[3 * temp + 1] = -(Params::gravity);//-(Params::gravity);
-		s->acceleration[3 * temp + 2] = 0.0f;
-	}
 	//std::cout << "I can go here u fucker ass dick man1";
 	// Initialize and setup list of neighbor particles
 	// Only stores particle whose index bigger than itself
@@ -126,22 +134,42 @@ void getAcceleration(SystemState* s){
 	s->nearParticleIndex = std::vector<std::vector<int>>(s->particleNum);
 	//std::cout << "I can go here u fucker ass dick man2";
 	for(int temp = 0;temp < s->particleNum;++temp){
+		s->acceleration[3 * temp + 0] = 0.0f;
+		s->acceleration[3 * temp + 1] = -(Params::gravity);//-(Params::gravity);
+		s->acceleration[3 * temp + 2] = 0.0f;
 		for(int temp2 = temp + 1;temp2 < s->particleNum;++temp2){
 			rp2 = getSqrDistance(position, temp, temp2);
-			if(hp2 > rp2){
+			if(hp2 * 0.9f > rp2){
 				s->nearParticleIndex[temp].push_back(temp2);
 			}
 		}
 	}
-	//std::cout << "I can go here u fucker ass dick man3";
+
+	float* aP,* aV,* aI;
+	aP = new float[3 * s->particleNum];
+	aV = new float[3 * s->particleNum];
+	aI = new float[3 * s->particleNum];
+	
+	memset(aP, 0, 3 * s->particleNum * sizeof(float));
+	memset(aV, 0, 3 * s->particleNum * sizeof(float));
+	memset(aI, 0, 3 * s->particleNum * sizeof(float));
+
 	// Acceleration of pressure
-	getPressureAcc(s);
+	std::thread t1(getPressureAcc, s, aP);
+	std::thread t2(getViscosityAcc, s, aV);
+	std::thread t3(getInteractiveAcc, s, aI);
 
-	// Acceleration of viscosity
-	getViscosityAcc(s);
+	t1.join();
+	t2.join();
+	t3.join();
 
-	// Acceleration of particle interactive
-	getInteractiveAcc(s);
+	//getPressureAcc(s, aP);
+	//getViscosityAcc(s, aV);
+	//getInteractiveAcc(s, aI);
+	
+	for(int temp = 0;temp < 3 * s->particleNum;++temp){
+		s->acceleration[temp] += (aP[temp] + aV[temp] + aI[temp]);
+	}
 }
 
 float getSqrDistance(float* position, int m, int n){
@@ -162,60 +190,54 @@ std::vector<float> getVecDistance(float* position, int m, int n){
 	return distance;
 }
 
-void getPressureAcc(SystemState* s){
+void getPressureAcc(SystemState* s, float* a){
 	getDensity(s);
 	getPressure(s);
 
-	float* acceleration = s->acceleration;
+	//float* acceleration = s->acceleration;
 	float* p = s->pressure;
 	float* rho = s->density;
-	float h = Params::radii;
-	float hp2 = h * h;
+	float hp2 = Params::radii * Params::radii;
 	int particleNum = s->particleNum;
 
-	float P, W, r, cbrtWeight;
-	float C = -945 / (32 * PI * (h * h * h) * (h * h * h) * (h * h * h));
+	float P, W, cbrtWeight, PW;
+	//float C = -945 / (32 * PI * (h * h * h) * (h * h * h) * (h * h * h));
+	std::vector<float> R;
 
 	for(int temp = 0;temp < particleNum;++temp){
 		for(int temp2 : s->nearParticleIndex[temp]){
 			P = -Params::mass * ((p[temp] / rho[temp]) + (p[temp2] / rho[temp2]));
-			std::vector<float> R = getVecDistance(s->position, temp, temp2);
+			R = getVecDistance(s->position, temp, temp2);
 			cbrtWeight = hp2 - getSqrDistance(s->position, temp, temp2);
-			W = C * cbrtWeight * cbrtWeight * cbrtWeight;
-
-			acceleration[3 * temp + 0] += P * W * R[0];
-			acceleration[3 * temp + 1] += P * W * R[1];
-			acceleration[3 * temp + 2] += P * W * R[2];
-			acceleration[3 * temp2 + 0] -= P * W * R[0];
-			acceleration[3 * temp2 + 1] -= P * W * R[1];
-			acceleration[3 * temp2 + 2] -= P * W * R[2];
+			W = Params::Cpv * cbrtWeight * cbrtWeight * cbrtWeight;
+			PW = P * W;
+			a[3 * temp + 0] += PW * R[0];
+			a[3 * temp + 1] += PW * R[1];
+			a[3 * temp + 2] += PW * R[2];
+			a[3 * temp2 + 0] -= PW * R[0];
+			a[3 * temp2 + 1] -= PW * R[1];
+			a[3 * temp2 + 2] -= PW * R[2];
 		}
 	}
 }
 
 void getDensity(SystemState* s){
-	float h = Params::radii;
-	float hp2 = h * h;
-	float hp3 = hp2 * h;
-	float BASE = 315 / (64 * PI * hp3);
-	float C = 315 / (64 * PI * (hp3 * hp3 * hp3));
+	float hp2 = Params::radii * Params::radii;
 
-	float rp2, cbrtWeight;
+	float rp2, cbrtWeight, cwww;
 	float* position = s->position;
 	float* density = s->density;
 
 	// Base density due to self
-	for(int temp = 0;temp < s->particleNum;++temp){
-		density[temp] = BASE;
-	}
-
 	// Addon densities due to nearby particles
 	for(int temp = 0;temp < s->particleNum;++temp){
+		density[temp] = Params::Cdb;
 		for(int temp2 : s->nearParticleIndex[temp]){
 			rp2 = getSqrDistance(position, temp, temp2);
 			cbrtWeight = hp2 - rp2;
-			density[temp] += C * cbrtWeight * cbrtWeight * cbrtWeight;
-			density[temp2] += C * cbrtWeight * cbrtWeight * cbrtWeight;
+			cwww = Params::Cd * cbrtWeight * cbrtWeight * cbrtWeight;
+			density[temp] += cwww;
+			density[temp2] += cwww;
 		}
 	}
 
@@ -223,10 +245,6 @@ void getDensity(SystemState* s){
 	for(int temp = 0;temp < s->particleNum;++temp){
 		density[temp] *= Params::mass;
 	}
-
-	// for(int temp = 0;temp < s->particleNum;++temp){
-	// 	std::cout << "density[" << temp << "] = " << density[temp] << std::endl; 
-	// }
 }
 
 void getPressure(SystemState* s){
@@ -238,28 +256,23 @@ void getPressure(SystemState* s){
 	}
 }
 
-void getViscosityAcc(SystemState* s){
+void getViscosityAcc(SystemState* s, float* a){
 	float* v = s->vH;
 	float* rho = s->density;
 	float* position = s->position;
-	float* a = s->acceleration;
-	float h = Params::radii;
-	float hp2 = h * h;
-	float hp3 = hp2 * h;
-	float Cv = Params::viscosity * Params::mass;
-	float C = -945 / (32 * PI * hp3 * hp3 * hp3);
+	float hp2 = Params::radii * Params::radii;
 
 	float Vx, Vy, Vz, cbrtWeight, rp2, W;
 
 	for(int temp = 0;temp < s->particleNum;++temp){
 		for(int temp2 : s->nearParticleIndex[temp]){
-			Vx = Cv * ((v[3 * temp2 + 0] - v[3 * temp + 0]) / (rho[temp] * rho[temp2]));
-			Vy = Cv * ((v[3 * temp2 + 1] - v[3 * temp + 1]) / (rho[temp] * rho[temp2]));
-			Vz = Cv * ((v[3 * temp2 + 2] - v[3 * temp + 2]) / (rho[temp] * rho[temp2]));
+			Vx = Params::Cv * ((v[3 * temp2 + 0] - v[3 * temp + 0]) / (rho[temp] * rho[temp2]));
+			Vy = Params::Cv * ((v[3 * temp2 + 1] - v[3 * temp + 1]) / (rho[temp] * rho[temp2]));
+			Vz = Params::Cv * ((v[3 * temp2 + 2] - v[3 * temp + 2]) / (rho[temp] * rho[temp2]));
 		
 			rp2 = getSqrDistance(position, temp, temp2);
 			cbrtWeight = hp2 - rp2;
-			W = C * (3 * cbrtWeight * cbrtWeight - 4 * rp2 * cbrtWeight);
+			W = Params::Cpv * (3 * cbrtWeight * cbrtWeight - 4 * rp2 * cbrtWeight);
 
 			a[3 * temp + 0] += Vx * W;
 			a[3 * temp + 1] += Vy * W;
@@ -271,64 +284,52 @@ void getViscosityAcc(SystemState* s){
 	}
 }
 
-void getInteractiveAcc(SystemState* s){
+void getInteractiveAcc(SystemState* s, float* a){
 	float* position = s->position;
-	float* a = s->acceleration;
-
-	float C = -Params::Cij * Params::mass * Params::mass;
 	std::vector<float> R;
-	float r;
+	float r, Cf;
 
 	for(int temp = 0;temp < s->particleNum;++temp){
 		for(int temp2 : s->nearParticleIndex[temp]){
 			R = getVecDistance(position, temp, temp2);
 			r = sqrt(getSqrDistance(position, temp, temp2));
-
-			a[3 * temp + 0] -= C * Force(r) * R[0];
-			a[3 * temp + 1] -= C * Force(r) * R[1];
-			a[3 * temp + 2] -= C * Force(r) * R[2];
-			a[3 * temp2 + 0] += C * Force(r) * R[0];
-			a[3 * temp2 + 1] += C * Force(r) * R[1];
-			a[3 * temp2 + 2] += C * Force(r) * R[2];
+			Cf = Params::Ci * Params::Cf * r;
+			a[3 * temp + 0] += Cf * R[0];
+			a[3 * temp + 1] += Cf * R[1];
+			a[3 * temp + 2] += Cf * R[2];
+			a[3 * temp2 + 0] -= Cf * R[0];
+			a[3 * temp2 + 1] -= Cf * R[1];
+			a[3 * temp2 + 2] -= Cf * R[2];
 		}
 	}
 }
 
-float Force(float r){
-	return r * cos(3 * PI / (2 * Params::k * Params::radii));
-}
+// float Force(float r){
+// 	return r * Params::Cf;
+// }
 
 ////////////////////////////////////////////
 void leapFrogStart(SystemState* s, double timeStep){
-	for(int temp = 0;temp < 3 * s->particleNum;++temp)
+	for(int temp = 0;temp < 3 * s->particleNum;++temp){
 		s->vH[temp] = s->vF[temp] + s->acceleration[temp] * timeStep / 2;
-	for(int temp = 0;temp < 3 * s->particleNum;++temp)
 		s->vF[temp] += s->acceleration[temp] * timeStep;
-	for(int temp = 0;temp < 3 * s->particleNum;++temp)
 		s->position[temp] += s->vH[temp] * timeStep;
+	}
 
 	reflectCheck(s);
 }
 
 void leapFrogStep(SystemState* s, double timeStep){
-	for(int temp = 0;temp < 3 * s->particleNum;++temp)
+	for(int temp = 0;temp < 3 * s->particleNum;++temp){
 		s->vH[temp] += s->acceleration[temp] * timeStep;
-	for(int temp = 0;temp < 3 * s->particleNum;++temp)
 		s->vF[temp] = s->vH[temp] + s->acceleration[temp] * timeStep / 2;
-	for(int temp = 0;temp < 3 * s->particleNum;++temp)
 		s->position[temp] += s->vH[temp] * timeStep;
+	}
 
 	reflectCheck(s);
 }
 
 void reflectCheck(SystemState* s){
-	// Boundary of the container
-	const float XMIN = 0.0f;
-	const float XMAX = 10.0f;
-	const float YMIN = 0.0f;
-	const float YMAX = 10.0f;
-	const float ZMIN = 0.0f;
-	const float ZMAX = 10.0f;
 
 	// Pointers to the detecting particle
 	float* vH = s->vH;
@@ -336,30 +337,26 @@ void reflectCheck(SystemState* s){
 	float* position = s->position;
 
 	for(int temp = 0;temp < s->particleNum;++temp, position += 3, vF += 3, vH += 3){
-		if(position[0] < XMIN) reflect(0, XMIN, position, vF, vH);
-		if(position[0] > XMAX) reflect(0, XMAX, position, vF, vH);
-		if(position[1] < YMIN) reflect(1, YMIN, position, vF, vH);
-		if(position[1] > YMAX) reflect(1, YMAX, position, vF, vH);
-		if(position[2] < ZMIN) reflect(2, ZMIN, position, vF, vH);
-		if(position[2] > ZMAX) reflect(2, ZMAX, position, vF, vH);
+		if(position[0] < Params::XMIN) reflect(0, Params::XMIN, position, vF, vH);
+		else if(position[0] > Params::XMAX) reflect(0, Params::XMAX, position, vF, vH);
+		if(position[1] < Params::YMIN) reflect(1, Params::YMIN, position, vF, vH);
+		else if(position[1] > Params::YMAX) reflect(1, Params::YMAX, position, vF, vH);
+		if(position[2] < Params::ZMIN) reflect(2, Params::ZMIN, position, vF, vH);
+		else if(position[2] > Params::ZMAX) reflect(2, Params::ZMAX, position, vF, vH);
 	}
 
 }
 
 void reflect(int axisIndex, float barrier, float* position, float* vF, float* vH){
-	
-	// Evergy lost rate when touched the wall
-	const float LOSS = 0.45f;
-
 	// Ignoring
 	if (vF[axisIndex] == 0)
 		return;
 
 	// Scale Back, due to the energy consumed (so each axis has loss)
 	float tBounce = (position[axisIndex] - barrier) / vF[axisIndex];
-	position[0] -= vF[0] * LOSS * tBounce;
-	position[1] -= vF[1] * LOSS * tBounce;
-	position[2] -= vF[2] * LOSS * tBounce;
+	position[0] -= vF[0] * Params::LOSS * tBounce;
+	position[1] -= vF[1] * Params::LOSS * tBounce;
+	position[2] -= vF[2] * Params::LOSS * tBounce;
 
 	// Reflection
 	position[axisIndex] = 2 * barrier - position[axisIndex];
@@ -367,11 +364,11 @@ void reflect(int axisIndex, float barrier, float* position, float* vF, float* vH
 	vH[axisIndex] = -vH[axisIndex];
 
 	// Apply velocity loss
-	vH[0] *= (1 - LOSS);
-	vH[1] *= (1 - LOSS);
-	vH[2] *= (1 - LOSS);
-	vF[0] *= (1 - LOSS);
-	vF[1] *= (1 - LOSS);
-	vF[2] *= (1 - LOSS);
+	vH[0] *= (1 - Params::LOSS);
+	vH[1] *= (1 - Params::LOSS);
+	vH[2] *= (1 - Params::LOSS);
+	vF[0] *= (1 - Params::LOSS);
+	vF[1] *= (1 - Params::LOSS);
+	vF[2] *= (1 - Params::LOSS);
 }
 
