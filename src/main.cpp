@@ -19,6 +19,7 @@
 #include <future>
 #include "SPHSimulation_2.h"
 #include "particlePlacements.h"
+#include <opencv2/opencv.hpp>
 #define BALL_AMOUNT s.particleNum
 #define PI 3.1415926f
 #define RAD2DEG (180.0f / PI)
@@ -58,6 +59,18 @@ bool future_is_ready(std::future<T> &t)
 
 int main(void)
 {
+	// cv::Mat src1 = cv::imread("../resource/lena.jpg");
+    cv::Mat src2 = cv::imread("../resource/watermelon.jpg");
+    // cv::Mat dst1;
+    cv::Mat dst2;
+    // cv::medianBlur(src1, dst1, 5);
+    cv::bilateralFilter(src2, dst2, 5 ,200 ,200);
+    // cv::imshow("origin1", src1);
+    // cv::imshow("medianBlur", dst1);
+    cv::imshow("origin2", src2);
+    cv::imshow("bilateralBlur", dst2);
+    // cv::waitKey(0);
+
 	GLFWwindow *window;
 	glfwSetErrorCallback(error_callback);
 	if (!glfwInit())
