@@ -98,7 +98,7 @@ int main(void)
 	auto prog = Program::LoadFromFile(
 		"../resource/vs_instanced.vert",
 		"../resource/gs.geom",
-		"../resource/fs_light_shad.frag");
+		"../resource/fs.frag");
 	auto progLight = Program::LoadFromFile(
 		"../resource/vs.vert",
 		"../resource/gs.geom",
@@ -139,7 +139,7 @@ int main(void)
 		}
 
 		float degree = 0.0f;
-		glm::vec3 object_color{ 1.0f };
+		glm::vec3 object_color{ 0.0f, 0.7686f, 1.0f };
 		static clock_t clockCount;
 		bool flat_shading = false;
 		bool bling_phong = false;
@@ -220,7 +220,7 @@ int main(void)
 			prog.use();
 			mesh.drawInstanced(position.size());
 
-			{
+			if(false){
 				progLight["vp"] = glm::perspective(45 / 180.0f * 3.1415926f, 16.0f / 9.0f, 0.1f, 10000.0f) *
 					glm::lookAt(glm::vec3{ 0, 0, 10 }, glm::vec3{ 0, 0, 0 }, glm::vec3{ 0, 1, 0 });
 				// point light

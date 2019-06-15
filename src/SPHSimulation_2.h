@@ -47,8 +47,9 @@ public:
 	static constexpr float Ci = -Cij * mass * mass;
 	static constexpr float Cdb = 315 / (64 * PI * (radii * radii * radii));
 	static constexpr float Cd = 315 / (64 * PI * (radii * radii * radii) * (radii * radii * radii) * (radii * radii * radii));
-	static constexpr float Cf = cos(3 * PI / (2 * k * radii));
+	static const float Cf;
 };
+const float Params::Cf = cos(3 * PI / (2 * Params::k * Params::radii));
 
 // Functions for initialization
 void setInitial(std::function<int(float, float, float)> initialPosFunc, SystemState* s);
@@ -145,10 +146,9 @@ void getAcceleration(SystemState* s){
 		}
 	}
 
-	float* aP,* aV,* aI;
-	aP = new float[3 * s->particleNum];
-	aV = new float[3 * s->particleNum];
-	aI = new float[3 * s->particleNum];
+	static float* aP = new float[3 * s->particleNum];
+	static float* aV = new float[3 * s->particleNum];
+	static float* aI = new float[3 * s->particleNum];
 	
 	memset(aP, 0, 3 * s->particleNum * sizeof(float));
 	memset(aV, 0, 3 * s->particleNum * sizeof(float));
