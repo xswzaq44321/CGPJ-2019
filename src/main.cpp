@@ -59,12 +59,6 @@ bool future_is_ready(std::future<T> &t)
 
 int main(void)
 {
-    cv::Mat src2 = cv::imread("maps/normal6.png");
-    cv::Mat dst2;
-    cv::bilateralFilter(src2, dst2, 5, 250, 250);
-    cv::imshow("origin2", src2);
-    cv::imshow("bilateralBlur", dst2);
-
 	GLFWwindow *window;
 	glfwSetErrorCallback(error_callback);
 	if (!glfwInit())
@@ -205,6 +199,8 @@ int main(void)
 			glfwGetFramebufferSize(window, &display_w, &display_h);
 			static std::vector<unsigned char> raw_data_normal(display_w * display_h * 4);
 			static std::vector<unsigned char> raw_data_depth(display_w * display_h * 4);
+			static std::vector<unsigned char> blurred_normal;
+			static std::vector<unsigned char> blurred_depth;
 
 			static glm::mat4 vs = glm::lookAt(glm::vec3{ 30, 10, 23 }, glm::vec3{ 0, 5, 0 }, glm::vec3{ 0, 1, 0 });
 			static glm::mat4 vp = glm::perspective(45 / 180.0f * 3.1415926f, 1280.0f / 720.0f, 0.1f, 10000.0f) * vs;
@@ -226,8 +222,27 @@ int main(void)
 				mesh.drawInstanced(position.size());
 
 				// make sure vector has enouth space to store
-				raw_data_normal.reserve(display_w * display_h * 4);
-				glReadPixels(0, 0, display_w, display_h, GL_RGBA, GL_UNSIGNED_BYTE, raw_data_normal.data());
+				raw_data_normal.resize(display_w * display_h * 3);
+				glReadPixels(0, 0, display_w, display_h, GL_RGB, GL_UNSIGNED_BYTE, raw_data_normal.data());
+
+				
+				cv::Mat nor_src = cv::Mat(display_h, display_w, CV_8UC3, raw_data_normal.data());
+				cv::Mat nor_dst;
+				cv::bilateralFilter(nor_src, nor_dst, 5 ,150 ,150);
+				std::vector<unsigned char> nor_blur(nor_dst.rows * nor_dst.cols * 3);
+				if (nor_dst.isContinuous())
+					nor_blur.assign((unsigned char*)nor_dst.datastart, (unsigned char*)nor_dst.dataend);
+
+				blurred_normal.resize(nor_blur.size() * 4/3.0);
+				for(int i = 0; i < nor_dst.cols; ++i){
+						for(int j = 0; j < nor_dst.rows; ++j){
+							blurred_normal[(i * nor_dst.rows + j) * 4 + 0] = nor_blur[(i * nor_dst.rows + j) * 3 + 0];
+							blurred_normal[(i * nor_dst.rows + j) * 4 + 1] = nor_blur[(i * nor_dst.rows + j) * 3 + 1];
+							blurred_normal[(i * nor_dst.rows + j) * 4 + 2] = nor_blur[(i * nor_dst.rows + j) * 3 + 2];
+							blurred_normal[(i * nor_dst.rows + j) * 4 + 3] = 255;
+						}
+					}
+
 
 				glClearColor(transparent_color.x, transparent_color.y, transparent_color.z, transparent_color.w);
 				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -240,11 +255,28 @@ int main(void)
 				prog_depth.use();
 				mesh.drawInstanced(position.size());
 
-				raw_data_depth.reserve(display_w * display_h * 4);
-				glReadPixels(0, 0, display_w, display_h, GL_RGBA, GL_UNSIGNED_BYTE, raw_data_depth.data());
+				raw_data_depth.resize(display_w * display_h * 3);
+				glReadPixels(0, 0, display_w, display_h, GL_RGB, GL_UNSIGNED_BYTE, raw_data_depth.data());
 
 				glDisable(GL_DEPTH_TEST);
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+				cv::Mat depth_src = cv::Mat(display_h, display_w, CV_8UC3, raw_data_depth.data());
+				cv::Mat depth_dst;
+				cv::bilateralFilter(depth_src, depth_dst, 5 ,150 ,150);
+				std::vector<unsigned char> depth_blur(depth_dst.rows * depth_dst.cols * 3);
+				if (depth_dst.isContinuous())
+					depth_blur.assign((unsigned char*)depth_dst.datastart, (unsigned char*)depth_dst.dataend);
+
+				blurred_depth.resize(depth_blur.size() * 4/3);
+				for(int i = 0; i < depth_dst.cols; ++i){
+					for(int j = 0; j < depth_dst.rows; ++j){
+							blurred_depth[(i * depth_dst.rows + j) * 4 + 0] = depth_blur[(i * depth_dst.rows + j) * 3 + 0];
+							blurred_depth[(i * depth_dst.rows + j) * 4 + 1] = depth_blur[(i * depth_dst.rows + j) * 3 + 1];
+							blurred_depth[(i * depth_dst.rows + j) * 4 + 2] = depth_blur[(i * depth_dst.rows + j) * 3 + 2];
+							blurred_depth[(i * depth_dst.rows + j) * 4 + 3] = 255;
+						}
+					}
 
 #if CREATE_PNG == 1
 				static double timePassed = 0;
@@ -334,7 +366,7 @@ int main(void)
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 				// load image, create texture and generate mipmaps
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, display_w, display_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw_data_depth.data());
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, display_w, display_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, blurred_depth.data());
 				glGenerateMipmap(GL_TEXTURE_2D);
 
 				if (texture2 == 0)
@@ -346,7 +378,7 @@ int main(void)
 				// set texture filtering parameters
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, display_w, display_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw_data_normal.data());
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, display_w, display_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, blurred_normal.data());
 				glGenerateMipmap(GL_TEXTURE_2D);
 
 				// note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
