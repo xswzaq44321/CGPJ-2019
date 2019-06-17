@@ -96,7 +96,7 @@ int main(void)
 	auto text = Texture2D::LoadFromFile("../resource/face.png");
 	auto mesh = StaticMesh::LoadMesh("../resource/sphere.obj");
 	auto prog = Program::LoadFromFile(
-		"../resource/vs_instanced.vert",
+		"../resource/vs_instanced_viewspace.vert",
 		"../resource/gs.geom",
 		"../resource/fs.frag");
 	auto progLight = Program::LoadFromFile(
@@ -104,11 +104,11 @@ int main(void)
 		"../resource/gs.geom",
 		"../resource/fs_light.frag");
 	auto prog_normal = Program::LoadFromFile(
-		"../resource/vs_instanced.vert",
+		"../resource/vs_instanced_viewspace.vert",
 		"../resource/gs.geom",
 		"../resource/fs_normal.frag");
 	auto prog_depth = Program::LoadFromFile(
-		"../resource/vs_instanced.vert",
+		"../resource/vs_instanced_viewspace.vert",
 		"../resource/gs.geom",
 		"../resource/fs_depth.frag");
 	GLuint fbo;
@@ -204,9 +204,10 @@ int main(void)
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			glEnable(GL_DEPTH_TEST);
-			static glm::mat4 vp = glm::perspective(45 / 180.0f * 3.1415926f, 1280.0f / 720.0f, 0.1f, 10000.0f) *
-				glm::lookAt(glm::vec3{ 30, 10, 23 }, glm::vec3{ 0, 5, 0 }, glm::vec3{ 0, 1, 0 });
+			static glm::mat4 vs = glm::lookAt(glm::vec3{ 30, 10, 23 }, glm::vec3{ 0, 5, 0 }, glm::vec3{ 0, 1, 0 });
+			static glm::mat4 vp = glm::perspective(45 / 180.0f * 3.1415926f, 1280.0f / 720.0f, 0.1f, 10000.0f) * vs;
 			prog["vp"] = vp;
+			prog["vs"] = vs;
 			prog["object_color"] = object_color;
 			prog["light_pos"] = light_pos;
 			prog["eye_pos"] = glm::vec3{ 0, 0, 10 };
@@ -239,6 +240,7 @@ int main(void)
 				glEnable(GL_DEPTH_TEST);
 
 				prog_normal["vp"] = vp;
+				prog_normal["vs"] = vs;
 				prog_normal["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
 
 				prog_normal.use();
@@ -265,7 +267,7 @@ int main(void)
 #if CREATE_PNG == 1
 				static double timePassed = 0;
 				timePassed += deltaTime;
-				if (timePassed > 1)
+				if (timePassed > 0.1)
 				{
 					timePassed = 0;
 
