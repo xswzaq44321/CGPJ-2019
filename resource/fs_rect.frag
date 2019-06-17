@@ -8,6 +8,7 @@ uniform sampler2D texture1;
 uniform sampler2D texture2;
 
 uniform vec3 light_pos;
+uniform vec3 object_color;
 uniform mat4 vs;
 uniform mat4 inv;
 uniform int bling_phong;
@@ -27,7 +28,7 @@ float getZ(float depth){
 
 void main()
 {
-    if(texture(texture1, TexCoord).rgb == vec3(1.0)) discard;
+    if(texture(texture1, TexCoord).rgb == vec3(1.0) || texture(texture2, TexCoord).rgb == vec3(1.0)) discard;
     vec3 depth = texture(texture1, TexCoord).rgb;
     vec3 normal = texture(texture2, TexCoord).rgb;
     normal = normalize(normal * 2.0 - 1.0);
@@ -52,6 +53,6 @@ void main()
         spec = cosine*pow(max(dot(r, e), 0), 30);
     }
 
-    FragColor = vec4(vec3(1.0)*cosine+spec, 1.0);
+    FragColor = vec4(object_color*cosine+spec, 1.0);
     // FragColor = vec4(vec3(myPos), 1.0);
 } 

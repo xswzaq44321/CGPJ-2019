@@ -26,6 +26,7 @@
 #define DEG2RAD (PI / 180.0f)
 #define GRAVITY 0.98f
 #define CREATE_PNG 0
+#define BLUR 1
 
 static void error_callback(int error, const char *description)
 {
@@ -141,11 +142,10 @@ int main(void)
 		}
 
 		float degree = 0.0f;
-		glm::vec3 object_color{ 1.0f };
+		glm::vec3 object_color{ 0.0f, 0.9098f, 1.0f };
 		static clock_t clockCount;
-		bool flat_shading = false;
 		bool bling_phong = false;
-		glm::vec3 light_pos = { 0.0f, 10.0f, 0.0f };
+		glm::vec3 light_pos = { 10.0f, 10.0f, 10.0f };
 
 		{
 			glGenFramebuffers(1, &fbo);
@@ -199,8 +199,8 @@ int main(void)
 			glfwGetFramebufferSize(window, &display_w, &display_h);
 			static std::vector<unsigned char> raw_data_normal(display_w * display_h * 4);
 			static std::vector<unsigned char> raw_data_depth(display_w * display_h * 4);
-			static std::vector<unsigned char> blurred_normal;
-			static std::vector<unsigned char> blurred_depth;
+			static std::vector<unsigned char> nor_blur;
+			static std::vector<unsigned char> depth_blur;
 
 			static glm::mat4 vs = glm::lookAt(glm::vec3{ 30, 10, 23 }, glm::vec3{ 0, 5, 0 }, glm::vec3{ 0, 1, 0 });
 			static glm::mat4 vp = glm::perspective(45 / 180.0f * 3.1415926f, 1280.0f / 720.0f, 0.1f, 10000.0f) * vs;
@@ -225,24 +225,14 @@ int main(void)
 				raw_data_normal.resize(display_w * display_h * 3);
 				glReadPixels(0, 0, display_w, display_h, GL_RGB, GL_UNSIGNED_BYTE, raw_data_normal.data());
 
-				
+#if BLUR == 1
 				cv::Mat nor_src = cv::Mat(display_h, display_w, CV_8UC3, raw_data_normal.data());
 				cv::Mat nor_dst;
-				cv::bilateralFilter(nor_src, nor_dst, 5 ,150 ,150);
-				std::vector<unsigned char> nor_blur(nor_dst.rows * nor_dst.cols * 3);
+				cv::bilateralFilter(nor_src, nor_dst, 5, 150, 150);
+				nor_blur.resize(nor_dst.rows * nor_dst.cols * 3);
 				if (nor_dst.isContinuous())
 					nor_blur.assign((unsigned char*)nor_dst.datastart, (unsigned char*)nor_dst.dataend);
-
-				blurred_normal.resize(nor_blur.size() * 4/3.0);
-				for(int i = 0; i < nor_dst.cols; ++i){
-						for(int j = 0; j < nor_dst.rows; ++j){
-							blurred_normal[(i * nor_dst.rows + j) * 4 + 0] = nor_blur[(i * nor_dst.rows + j) * 3 + 0];
-							blurred_normal[(i * nor_dst.rows + j) * 4 + 1] = nor_blur[(i * nor_dst.rows + j) * 3 + 1];
-							blurred_normal[(i * nor_dst.rows + j) * 4 + 2] = nor_blur[(i * nor_dst.rows + j) * 3 + 2];
-							blurred_normal[(i * nor_dst.rows + j) * 4 + 3] = 255;
-						}
-					}
-
+#endif
 
 				glClearColor(transparent_color.x, transparent_color.y, transparent_color.z, transparent_color.w);
 				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -261,22 +251,14 @@ int main(void)
 				glDisable(GL_DEPTH_TEST);
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+#if BLUR == 1
 				cv::Mat depth_src = cv::Mat(display_h, display_w, CV_8UC3, raw_data_depth.data());
 				cv::Mat depth_dst;
-				cv::bilateralFilter(depth_src, depth_dst, 5 ,150 ,150);
-				std::vector<unsigned char> depth_blur(depth_dst.rows * depth_dst.cols * 3);
+				cv::bilateralFilter(depth_src, depth_dst, 5, 150, 150);
+				depth_blur.resize(depth_dst.rows * depth_dst.cols * 3);
 				if (depth_dst.isContinuous())
 					depth_blur.assign((unsigned char*)depth_dst.datastart, (unsigned char*)depth_dst.dataend);
-
-				blurred_depth.resize(depth_blur.size() * 4/3);
-				for(int i = 0; i < depth_dst.cols; ++i){
-					for(int j = 0; j < depth_dst.rows; ++j){
-							blurred_depth[(i * depth_dst.rows + j) * 4 + 0] = depth_blur[(i * depth_dst.rows + j) * 3 + 0];
-							blurred_depth[(i * depth_dst.rows + j) * 4 + 1] = depth_blur[(i * depth_dst.rows + j) * 3 + 1];
-							blurred_depth[(i * depth_dst.rows + j) * 4 + 2] = depth_blur[(i * depth_dst.rows + j) * 3 + 2];
-							blurred_depth[(i * depth_dst.rows + j) * 4 + 3] = 255;
-						}
-					}
+#endif
 
 #if CREATE_PNG == 1
 				static double timePassed = 0;
@@ -318,7 +300,7 @@ int main(void)
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			glEnable(GL_DEPTH_TEST);
-			if(true){
+			if (true) {
 				float vertices[] = {
 					// position			// texture coords
 					1.0f, 1.0f, 0.0f,	1.0f, 1.0f,	// top right
@@ -366,7 +348,11 @@ int main(void)
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 				// load image, create texture and generate mipmaps
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, display_w, display_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, blurred_depth.data());
+#if BLUR == 1
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, display_w, display_h, 0, GL_RGB, GL_UNSIGNED_BYTE, depth_blur.data());
+#else
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, display_w, display_h, 0, GL_RGB, GL_UNSIGNED_BYTE, raw_data_depth.data());
+#endif
 				glGenerateMipmap(GL_TEXTURE_2D);
 
 				if (texture2 == 0)
@@ -378,7 +364,11 @@ int main(void)
 				// set texture filtering parameters
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, display_w, display_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, blurred_normal.data());
+#if BLUR == 1
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, display_w, display_h, 0, GL_RGB, GL_UNSIGNED_BYTE, nor_blur.data());
+#else
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, display_w, display_h, 0, GL_RGB, GL_UNSIGNED_BYTE, raw_data_normal.data());
+#endif
 				glGenerateMipmap(GL_TEXTURE_2D);
 
 				// note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
@@ -395,6 +385,7 @@ int main(void)
 				prog["texture1"] = 0;
 				prog["texture2"] = 1;
 				prog["light_pos"] = light_pos;
+				prog["object_color"] = object_color;
 				prog["vs"] = vs;
 				prog["inv"] = glm::inverse(vp);
 				prog["ww"] = display_w;
@@ -403,7 +394,6 @@ int main(void)
 				prog["far"] = myFar;
 				prog["bling_phong"] = static_cast<int>(bling_phong);
 				prog.use();
-				//mesh.drawInstanced(position.size());
 				glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
 				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 			}
@@ -426,7 +416,6 @@ int main(void)
 			bool new_shader = false;
 			// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
 			{
-				static int counter = 0;
 
 				ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
 
@@ -434,26 +423,11 @@ int main(void)
 				ImGui::ColorEdit3("clear color", (float *)&clear_color);		 // Edit 3 floats representing a color
 				ImGui::ColorEdit3("object color", glm::value_ptr(object_color)); // Edit 3 floats representing a color
 				ImGui::SliderFloat3("Position", glm::value_ptr(light_pos), -10, 10);
-				ImGui::SliderFloat("near", &myNear, 0.0f, 10.0f);			 // Edit 1 float using a slider from 0.0f to 1.0f
-				ImGui::SliderFloat("far", &myFar, 1.0f, 100.0f);			 // Edit 1 float using a slider from 0.0f to 1.0f
 
-				if (ImGui::Button("Button")) // Buttons return true when clicked (most widgets return true when edited/activated)
-					counter++;
-				ImGui::SameLine();
-				ImGui::Text("counter = %d", counter);
-				ImGui::Checkbox("Flat Shading", &flat_shading);
 				ImGui::Checkbox("Bling Phong", &bling_phong);
 				ImGui::Image(reinterpret_cast<ImTextureID>(text.id()), ImVec2{ 128, 128 });
 				//ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", deltaTime, 1 / deltaTime);
-				// if(ImGui::Button("Reload Shader")) {
-				//     auto new_prog = Program::LoadFromFile("../resource/vs.vert", "../resource/fs.frag");
-				//     // because we would like to switch value of prog
-				//     // we need to release object on our own.
-				//     prog.release();
-				//     prog = new_prog;
-
-				// }
 				ImGui::End();
 			}
 
@@ -463,7 +437,7 @@ int main(void)
 
 			glfwSwapBuffers(window);
 			glfwPollEvents();
-		}
+			}
 
 #if CREATE_PNG == 1
 		while (threadVec.size() != 0) {
@@ -478,8 +452,8 @@ int main(void)
 		}
 #endif
 		glDeleteFramebuffers(1, &fbo);
-	}
+		}
 	glfwDestroyWindow(window);
 	glfwTerminate();
 	exit(EXIT_SUCCESS);
-}
+		}
