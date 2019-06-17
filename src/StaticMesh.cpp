@@ -75,6 +75,11 @@ StaticMesh StaticMesh::LoadMesh(const std::string &filename)
     return ret;
 }
 
+StaticMesh StaticMesh::LoadTris(const std::vector<float>& vertices)
+{
+	return StaticMesh();
+}
+
 void StaticMesh::LoadInstancedArrays(const std::vector<glm::vec3>& v)
 {
 	glBindVertexArray(vao);
