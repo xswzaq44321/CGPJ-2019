@@ -12,7 +12,6 @@ mkdir build
 cd build
 conan remote add bincrafters https://api.bintray.com/conan/bincrafters/public-conan
 conan install .. --build glad -sbuild_type=Debug
-conan install opencv/4.0.1@conan/stable
 ```
 
 ## Configure
