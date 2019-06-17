@@ -1,4 +1,4 @@
-
+﻿
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -100,12 +100,13 @@ int main(void)
 	ImGui::StyleColorsDark();
 
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+	ImVec4 transparent_color = ImVec4(1.0f, 1.0f, 1.0f, 0.0f);
+	float myNear = 0.1f, myFar = 100.0f;
 	auto text = Texture2D::LoadFromFile("../resource/face.png");
 	auto mesh = StaticMesh::LoadMesh("../resource/sphere.obj");
 	auto prog = Program::LoadFromFile(
-		"../resource/vs_instanced_viewspace.vert",
-		"../resource/gs.geom",
-		"../resource/fs.frag");
+		"../resource/vs_rect.vert",
+		"../resource/fs_rect.frag");
 	auto progLight = Program::LoadFromFile(
 		"../resource/vs.vert",
 		"../resource/gs.geom",
@@ -150,7 +151,7 @@ int main(void)
 		static clock_t clockCount;
 		bool flat_shading = false;
 		bool bling_phong = false;
-		glm::vec3 light_pos = {0.0f, 10.0f, 0.0f};
+		glm::vec3 light_pos = { 0.0f, 10.0f, 0.0f };
 
 		{
 			glGenFramebuffers(1, &fbo);
@@ -194,7 +195,7 @@ int main(void)
 			clockCount = clock();
 			// std::cout << deltaTime << std::endl;
 			degree += 0;
-			for(int temp = 0;temp < Params::steps;++temp){
+			for (int temp = 0; temp < Params::steps; ++temp) {
 				getAcceleration(&s);
 				leapFrogStep(&s, Params::timeStep);
 			}
@@ -204,62 +205,36 @@ int main(void)
 			glfwGetFramebufferSize(window, &display_w, &display_h);
 			static std::vector<unsigned char> raw_data_normal(display_w * display_h * 4);
 			static std::vector<unsigned char> raw_data_depth(display_w * display_h * 4);
-			glViewport(0, 0, display_w, display_h);
-			glEnable(GL_DEPTH_TEST);
 
-			glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-			glEnable(GL_DEPTH_TEST);
 			static glm::mat4 vs = glm::lookAt(glm::vec3{ 30, 10, 23 }, glm::vec3{ 0, 5, 0 }, glm::vec3{ 0, 1, 0 });
 			static glm::mat4 vp = glm::perspective(45 / 180.0f * 3.1415926f, 1280.0f / 720.0f, 0.1f, 10000.0f) * vs;
-			prog["vp"] = vp;
-			prog["vs"] = vs;
-			prog["object_color"] = object_color;
-			prog["light_pos"] = light_pos;
-			prog["eye_pos"] = glm::vec3{ 0, 0, 10 };
-			prog["text"] = 0;
-			text.bindToChannel(0);
-			prog["flat_shading"] = static_cast<int>(flat_shading);
-			prog["bling_phong"] = static_cast<int>(bling_phong);
-			prog["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
-
-			mesh.LoadInstancedArrays(position);
-			prog.use();
-			mesh.drawInstanced(position.size());
-
-			if(false){
-				progLight["vp"] = vp;
-				// point light
-				progLight["model"] = glm::translate(glm::mat4(1.0f), light_pos) * glm::scale(glm::mat4(1.0f), glm::vec3{ 0.2f });
-
-				progLight.use();
-				mesh.draw();
-			}
-
-			glDisable(GL_DEPTH_TEST);
-
 			{ // drawing normal map
 				glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 				glViewport(0, 0, display_w, display_h);
-				glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+				glClearColor(transparent_color.x, transparent_color.y, transparent_color.z, transparent_color.w);
 				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 				glEnable(GL_DEPTH_TEST);
 
 				prog_normal["vp"] = vp;
 				prog_normal["vs"] = vs;
+				prog_normal["near"] = myNear;
+				prog_normal["far"] = myFar;
 				prog_normal["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
 
+				mesh.LoadInstancedArrays(position);
 				prog_normal.use();
 				mesh.drawInstanced(position.size());
 
-				// make sure vector have enouth space to store
+				// make sure vector has enouth space to store
 				raw_data_normal.reserve(display_w * display_h * 4);
 				glReadPixels(0, 0, display_w, display_h, GL_RGBA, GL_UNSIGNED_BYTE, raw_data_normal.data());
 
-				glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+				glClearColor(transparent_color.x, transparent_color.y, transparent_color.z, transparent_color.w);
 				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 				prog_depth["vp"] = vp;
+				prog_depth["vs"] = vs;
+				prog_depth["near"] = myNear;
+				prog_depth["far"] = myFar;
 				prog_depth["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
 
 				prog_depth.use();
@@ -304,6 +279,112 @@ int main(void)
 				}
 #endif // CREATE_PNG
 			}
+			glViewport(0, 0, display_w, display_h);
+			glEnable(GL_DEPTH_TEST);
+
+			glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+			glEnable(GL_DEPTH_TEST);
+			if(true){
+				float vertices[] = {
+					// position			// texture coords
+					1.0f, 1.0f, 0.0f,	1.0f, 1.0f,	// top right
+					1.0f, -1.0f, 0.0f,	1.0f, 0.0f,	// bottom right
+					-1.0f, -1.0f, 0.0f,	0.0f, 0.0f,	// bottom left
+					-1.0f, 1.0f, 0.0f,	0.0f, 1.0f	// top left
+				};
+				unsigned int indices[] = {
+					0, 1, 3, // first triangle
+					1, 2, 3  // second triangle
+				};
+
+				static unsigned int VBO = 0, VAO = 0, EBO = 0;
+				if (VAO == 0)
+					glGenVertexArrays(1, &VAO);
+				if (VBO == 0)
+					glGenBuffers(1, &VBO);
+				if (EBO == 0)
+					glGenBuffers(1, &EBO);
+
+				glBindVertexArray(VAO);
+
+				glBindBuffer(GL_ARRAY_BUFFER, VBO);
+				glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+				glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+				// position attribute
+				glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+				glEnableVertexAttribArray(0);
+
+				// texture coord attribute
+				glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+				glEnableVertexAttribArray(1);
+
+				static unsigned int texture1 = 0, texture2 = 0;
+				if (texture1 == 0)
+					glGenTextures(1, &texture1);
+				glBindTexture(GL_TEXTURE_2D, texture1); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
+				// set the texture wrapping parameters
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+				// set texture filtering parameters
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+				// load image, create texture and generate mipmaps
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, display_w, display_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw_data_depth.data());
+				glGenerateMipmap(GL_TEXTURE_2D);
+
+				if (texture2 == 0)
+					glGenTextures(1, &texture2);
+				glBindTexture(GL_TEXTURE_2D, texture2);
+				// set the texture wrapping parameters
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+				// set texture filtering parameters
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, display_w, display_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw_data_normal.data());
+				glGenerateMipmap(GL_TEXTURE_2D);
+
+				// note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
+				glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+				// You can unbind the VAO afterwards so other VAO calls won't accidentally modify this VAO, but this rarely happens. Modifying other
+				// VAOs requires a call to glBindVertexArray anyways so we generally don't unbind VAOs (nor VBOs) when it's not directly necessary.
+				glBindVertexArray(0);
+
+				glActiveTexture(GL_TEXTURE0);
+				glBindTexture(GL_TEXTURE_2D, texture1);
+				glActiveTexture(GL_TEXTURE1);
+				glBindTexture(GL_TEXTURE_2D, texture2);
+				prog["texture1"] = 0;
+				prog["texture2"] = 1;
+				prog["light_pos"] = light_pos;
+				prog["vs"] = vs;
+				prog["inv"] = glm::inverse(vp);
+				prog["ww"] = display_w;
+				prog["wh"] = display_h;
+				prog["near"] = myNear;
+				prog["far"] = myFar;
+				prog["bling_phong"] = static_cast<int>(bling_phong);
+				prog.use();
+				//mesh.drawInstanced(position.size());
+				glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
+				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+			}
+
+			if (true) {
+				progLight["vp"] = vp;
+				progLight["model"] = glm::translate(glm::mat4(1.0f), light_pos) * glm::scale(glm::mat4(1.0f), glm::vec3{ 0.2f });
+
+				progLight.use();
+				mesh.draw();
+			}
+
+			glDisable(GL_DEPTH_TEST);
 
 			// Start the Dear ImGui frame
 			ImGui_ImplOpenGL3_NewFrame();
@@ -321,6 +402,8 @@ int main(void)
 				ImGui::ColorEdit3("clear color", (float *)&clear_color);		 // Edit 3 floats representing a color
 				ImGui::ColorEdit3("object color", glm::value_ptr(object_color)); // Edit 3 floats representing a color
 				ImGui::SliderFloat3("Position", glm::value_ptr(light_pos), -10, 10);
+				ImGui::SliderFloat("near", &myNear, 0.0f, 10.0f);			 // Edit 1 float using a slider from 0.0f to 1.0f
+				ImGui::SliderFloat("far", &myFar, 1.0f, 100.0f);			 // Edit 1 float using a slider from 0.0f to 1.0f
 
 				if (ImGui::Button("Button")) // Buttons return true when clicked (most widgets return true when edited/activated)
 					counter++;
@@ -330,7 +413,7 @@ int main(void)
 				ImGui::Checkbox("Bling Phong", &bling_phong);
 				ImGui::Image(reinterpret_cast<ImTextureID>(text.id()), ImVec2{ 128, 128 });
 				//ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", deltaTime, 1/deltaTime);
+				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", deltaTime, 1 / deltaTime);
 				// if(ImGui::Button("Reload Shader")) {
 				//     auto new_prog = Program::LoadFromFile("../resource/vs.vert", "../resource/fs.frag");
 				//     // because we would like to switch value of prog

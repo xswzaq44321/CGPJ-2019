@@ -11,6 +11,7 @@ public:
     void release();
 
     static StaticMesh LoadMesh(const std::string &filename);
+	static StaticMesh LoadTris(const std::vector<float>& vertices);
 	void LoadInstancedArrays(const std::vector<glm::vec3> &);
     void draw();
 	void drawInstanced(int count);
