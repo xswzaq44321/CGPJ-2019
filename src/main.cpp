@@ -25,7 +25,7 @@
 #define RAD2DEG (180.0f / PI)
 #define DEG2RAD (PI / 180.0f)
 #define GRAVITY 0.98f
-#define CREATE_PNG 0
+#define CREATE_PNG 1
 
 static void error_callback(int error, const char *description)
 {
@@ -60,11 +60,11 @@ bool future_is_ready(std::future<T> &t)
 int main(void)
 {
 	// cv::Mat src1 = cv::imread("../resource/lena.jpg");
-    cv::Mat src2 = cv::imread("../resource/watermelon.jpg");
+    cv::Mat src2 = cv::imread("../maps/normal1.png");
     // cv::Mat dst1;
     cv::Mat dst2;
     // cv::medianBlur(src1, dst1, 5);
-    cv::bilateralFilter(src2, dst2, 5 ,200 ,200);
+    cv::bilateralFilter(src2, dst2, 10, 200, 200);
     // cv::imshow("origin1", src1);
     // cv::imshow("medianBlur", dst1);
     cv::imshow("origin2", src2);
@@ -278,7 +278,7 @@ int main(void)
 #if CREATE_PNG == 1
 				static double timePassed = 0;
 				timePassed += deltaTime;
-				if (timePassed > 1)
+				if (timePassed > 0.5)
 				{
 					timePassed = 0;
 
