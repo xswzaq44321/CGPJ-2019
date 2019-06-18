@@ -11,7 +11,7 @@ bool centerBox(float x, float y, float z);
 bool centerSphere(float x, float y, float z);
 
 bool centerBox(float x, float y, float z){
-	return ((x >= 2.0f && x <= 8.0f) && (y >= 6.0f && y <= 8.0f) && (z >= 2.0f && z <= 8.0f));
+	return ((x >= 2.0f && x <= 8.0f) && (y >= 7.0f && y <= 9.0f) && (z >= 2.0f && z <= 8.0f));
 }
 
 bool centerSphere(float x, float y, float z){
