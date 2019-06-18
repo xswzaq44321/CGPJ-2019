@@ -303,27 +303,27 @@ int main(void)
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			glEnable(GL_DEPTH_TEST);
+			float vertices[] = {
+				// position			// texture coords
+				1.0f, 1.0f, 0.0f,	1.0f, 1.0f,	// top right
+				1.0f, -1.0f, 0.0f,	1.0f, 0.0f,	// bottom right
+				-1.0f, -1.0f, 0.0f,	0.0f, 0.0f,	// bottom left
+				-1.0f, 1.0f, 0.0f,	0.0f, 1.0f	// top left
+			};
+			unsigned int indices[] = {
+				0, 1, 3, // first triangle
+				1, 2, 3  // second triangle
+			};
+
+			static unsigned int VBO = 0, VAO = 0, EBO = 0;
+			static unsigned int texture1 = 0, texture2 = 0;
+			if (VAO == 0)
+				glGenVertexArrays(1, &VAO);
+			if (VBO == 0)
+				glGenBuffers(1, &VBO);
+			if (EBO == 0)
+				glGenBuffers(1, &EBO);
 			{
-				float vertices[] = {
-					// position			// texture coords
-					1.0f, 1.0f, 0.0f,	1.0f, 1.0f,	// top right
-					1.0f, -1.0f, 0.0f,	1.0f, 0.0f,	// bottom right
-					-1.0f, -1.0f, 0.0f,	0.0f, 0.0f,	// bottom left
-					-1.0f, 1.0f, 0.0f,	0.0f, 1.0f	// top left
-				};
-				unsigned int indices[] = {
-					0, 1, 3, // first triangle
-					1, 2, 3  // second triangle
-				};
-
-				static unsigned int VBO = 0, VAO = 0, EBO = 0;
-				if (VAO == 0)
-					glGenVertexArrays(1, &VAO);
-				if (VBO == 0)
-					glGenBuffers(1, &VBO);
-				if (EBO == 0)
-					glGenBuffers(1, &EBO);
-
 				glBindVertexArray(VAO);
 
 				glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -340,7 +340,6 @@ int main(void)
 				glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 				glEnableVertexAttribArray(1);
 
-				static unsigned int texture1 = 0, texture2 = 0;
 				if (texture1 == 0)
 					glGenTextures(1, &texture1);
 				glBindTexture(GL_TEXTURE_2D, texture1); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
@@ -410,26 +409,6 @@ int main(void)
 				glEnable(GL_DEPTH_TEST);
 
 				{
-					float vertices[] = {
-						// position			// texture coords
-						1.0f, 1.0f, 0.0f,	1.0f, 1.0f,	// top right
-						1.0f, -1.0f, 0.0f,	1.0f, 0.0f,	// bottom right
-						-1.0f, -1.0f, 0.0f,	0.0f, 0.0f,	// bottom left
-						-1.0f, 1.0f, 0.0f,	0.0f, 1.0f	// top left
-					};
-					unsigned int indices[] = {
-						0, 1, 3, // first triangle
-						1, 2, 3  // second triangle
-					};
-
-					static unsigned int VBO = 0, VAO = 0, EBO = 0;
-					if (VAO == 0)
-						glGenVertexArrays(1, &VAO);
-					if (VBO == 0)
-						glGenBuffers(1, &VBO);
-					if (EBO == 0)
-						glGenBuffers(1, &EBO);
-
 					glBindVertexArray(VAO);
 
 					glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -446,29 +425,11 @@ int main(void)
 					glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 					glEnableVertexAttribArray(1);
 
-					static unsigned int texture1 = 0, texture2 = 0;
-					if (texture1 == 0)
-						glGenTextures(1, &texture1);
 					glBindTexture(GL_TEXTURE_2D, texture1); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
-					// set the texture wrapping parameters
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-					// set texture filtering parameters
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-					// load image, create texture and generate mipmaps
 					glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, display_w, display_h, 0, GL_RGB, GL_UNSIGNED_BYTE, depth_blur.data());
 					glGenerateMipmap(GL_TEXTURE_2D);
 
-					if (texture2 == 0)
-						glGenTextures(1, &texture2);
 					glBindTexture(GL_TEXTURE_2D, texture2);
-					// set the texture wrapping parameters
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-					// set texture filtering parameters
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 					glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, display_w, display_h, 0, GL_RGB, GL_UNSIGNED_BYTE, nor_blur.data());
 					glGenerateMipmap(GL_TEXTURE_2D);
 
