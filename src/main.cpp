@@ -26,7 +26,7 @@
 #define DEG2RAD (PI / 180.0f)
 #define GRAVITY 0.98f
 #define CREATE_PNG 0
-#define BLUR 1
+#define BLUR 0
 
 static void error_callback(int error, const char *description)
 {
@@ -145,6 +145,7 @@ int main(void)
 		glm::vec3 object_color{ 0.0f, 0.9098f, 1.0f };
 		static clock_t clockCount;
 		bool bling_phong = false;
+		bool doBlur = false;
 		glm::vec3 light_pos = { 10.0f, 10.0f, 10.0f };
 
 		{
@@ -179,10 +180,8 @@ int main(void)
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
 
-#if CREATE_PNG == 1
 		std::vector<std::future<void>> threadVec;
 		threadVec.reserve(10);
-#endif
 		while (!glfwWindowShouldClose(window))
 		{
 			double deltaTime = (double)(clock() - clockCount) / CLOCKS_PER_SEC;
@@ -202,7 +201,8 @@ int main(void)
 			static std::vector<unsigned char> nor_blur;
 			static std::vector<unsigned char> depth_blur;
 
-			static glm::mat4 vs = glm::lookAt(glm::vec3{ 30, 10, 23 }, glm::vec3{ 0, 5, 0 }, glm::vec3{ 0, 1, 0 });
+			static glm::vec3 cameraPos = { 30, 10, 23 };
+			static glm::mat4 vs = glm::lookAt(cameraPos, glm::vec3{ 0, 5, 0 }, glm::vec3{ 0, 1, 0 });
 			static glm::mat4 vp = glm::perspective(45 / 180.0f * 3.1415926f, 1280.0f / 720.0f, 0.1f, 10000.0f) * vs;
 			{ // drawing normal map
 				glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -211,11 +211,14 @@ int main(void)
 				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 				glEnable(GL_DEPTH_TEST);
 
+				vs = glm::lookAt(cameraPos, glm::vec3{ 0, 5, 0 }, glm::vec3{ 0, 1, 0 });
+				vp = glm::perspective(45 / 180.0f * 3.1415926f, 1280.0f / 720.0f, 0.1f, 10000.0f) * vs;
+
 				prog_normal["vp"] = vp;
 				prog_normal["vs"] = vs;
 				prog_normal["near"] = myNear;
 				prog_normal["far"] = myFar;
-				prog_normal["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
+				prog_normal["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.4f));
 
 				mesh.LoadInstancedArrays(position);
 				prog_normal.use();
@@ -225,14 +228,14 @@ int main(void)
 				raw_data_normal.resize(display_w * display_h * 3);
 				glReadPixels(0, 0, display_w, display_h, GL_RGB, GL_UNSIGNED_BYTE, raw_data_normal.data());
 
-#if BLUR == 1
 				cv::Mat nor_src = cv::Mat(display_h, display_w, CV_8UC3, raw_data_normal.data());
 				cv::Mat nor_dst;
-				cv::bilateralFilter(nor_src, nor_dst, 5, 150, 150);
+				if (doBlur) {
+					cv::bilateralFilter(nor_src, nor_dst, 15, 500, 500);
+				}
 				nor_blur.resize(nor_dst.rows * nor_dst.cols * 3);
 				if (nor_dst.isContinuous())
 					nor_blur.assign((unsigned char*)nor_dst.datastart, (unsigned char*)nor_dst.dataend);
-#endif
 
 				glClearColor(transparent_color.x, transparent_color.y, transparent_color.z, transparent_color.w);
 				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -240,7 +243,7 @@ int main(void)
 				prog_depth["vs"] = vs;
 				prog_depth["near"] = myNear;
 				prog_depth["far"] = myFar;
-				prog_depth["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.3f));
+				prog_depth["model"] = glm::rotate(glm::mat4(1.0f), degree * 3.1415926f / 180.0f, glm::vec3(0, 1, 0)) * glm::scale(glm::mat4(1.0f), glm::vec3(0.4f));
 
 				prog_depth.use();
 				mesh.drawInstanced(position.size());
@@ -251,14 +254,14 @@ int main(void)
 				glDisable(GL_DEPTH_TEST);
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-#if BLUR == 1
 				cv::Mat depth_src = cv::Mat(display_h, display_w, CV_8UC3, raw_data_depth.data());
 				cv::Mat depth_dst;
-				cv::bilateralFilter(depth_src, depth_dst, 5, 150, 150);
+				if (doBlur) {
+					cv::bilateralFilter(depth_src, depth_dst, 15, 500, 500);
+				}
 				depth_blur.resize(depth_dst.rows * depth_dst.cols * 3);
 				if (depth_dst.isContinuous())
 					depth_blur.assign((unsigned char*)depth_dst.datastart, (unsigned char*)depth_dst.dataend);
-#endif
 
 #if CREATE_PNG == 1
 				static double timePassed = 0;
@@ -300,7 +303,7 @@ int main(void)
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			glEnable(GL_DEPTH_TEST);
-			if (true) {
+			{
 				float vertices[] = {
 					// position			// texture coords
 					1.0f, 1.0f, 0.0f,	1.0f, 1.0f,	// top right
@@ -348,11 +351,8 @@ int main(void)
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 				// load image, create texture and generate mipmaps
-#if BLUR == 1
 				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, display_w, display_h, 0, GL_RGB, GL_UNSIGNED_BYTE, depth_blur.data());
-#else
 				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, display_w, display_h, 0, GL_RGB, GL_UNSIGNED_BYTE, raw_data_depth.data());
-#endif
 				glGenerateMipmap(GL_TEXTURE_2D);
 
 				if (texture2 == 0)
@@ -364,11 +364,8 @@ int main(void)
 				// set texture filtering parameters
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-#if BLUR == 1
 				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, display_w, display_h, 0, GL_RGB, GL_UNSIGNED_BYTE, nor_blur.data());
-#else
 				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, display_w, display_h, 0, GL_RGB, GL_UNSIGNED_BYTE, raw_data_normal.data());
-#endif
 				glGenerateMipmap(GL_TEXTURE_2D);
 
 				// note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
@@ -397,13 +394,130 @@ int main(void)
 				glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
 				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 			}
-
-			if (true) {
+			{
 				progLight["vp"] = vp;
 				progLight["model"] = glm::translate(glm::mat4(1.0f), light_pos) * glm::scale(glm::mat4(1.0f), glm::vec3{ 0.2f });
 
 				progLight.use();
 				mesh.draw();
+			}
+			if (doBlur) {
+				doBlur = false;
+				glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+				glViewport(0, 0, display_w, display_h);
+				glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+				glEnable(GL_DEPTH_TEST);
+
+				{
+					float vertices[] = {
+						// position			// texture coords
+						1.0f, 1.0f, 0.0f,	1.0f, 1.0f,	// top right
+						1.0f, -1.0f, 0.0f,	1.0f, 0.0f,	// bottom right
+						-1.0f, -1.0f, 0.0f,	0.0f, 0.0f,	// bottom left
+						-1.0f, 1.0f, 0.0f,	0.0f, 1.0f	// top left
+					};
+					unsigned int indices[] = {
+						0, 1, 3, // first triangle
+						1, 2, 3  // second triangle
+					};
+
+					static unsigned int VBO = 0, VAO = 0, EBO = 0;
+					if (VAO == 0)
+						glGenVertexArrays(1, &VAO);
+					if (VBO == 0)
+						glGenBuffers(1, &VBO);
+					if (EBO == 0)
+						glGenBuffers(1, &EBO);
+
+					glBindVertexArray(VAO);
+
+					glBindBuffer(GL_ARRAY_BUFFER, VBO);
+					glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+					glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+					glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+					// position attribute
+					glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+					glEnableVertexAttribArray(0);
+
+					// texture coord attribute
+					glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+					glEnableVertexAttribArray(1);
+
+					static unsigned int texture1 = 0, texture2 = 0;
+					if (texture1 == 0)
+						glGenTextures(1, &texture1);
+					glBindTexture(GL_TEXTURE_2D, texture1); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
+					// set the texture wrapping parameters
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+					// set texture filtering parameters
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+					// load image, create texture and generate mipmaps
+					glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, display_w, display_h, 0, GL_RGB, GL_UNSIGNED_BYTE, depth_blur.data());
+					glGenerateMipmap(GL_TEXTURE_2D);
+
+					if (texture2 == 0)
+						glGenTextures(1, &texture2);
+					glBindTexture(GL_TEXTURE_2D, texture2);
+					// set the texture wrapping parameters
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+					// set texture filtering parameters
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+					glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, display_w, display_h, 0, GL_RGB, GL_UNSIGNED_BYTE, nor_blur.data());
+					glGenerateMipmap(GL_TEXTURE_2D);
+
+					// note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
+					glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+					// You can unbind the VAO afterwards so other VAO calls won't accidentally modify this VAO, but this rarely happens. Modifying other
+					// VAOs requires a call to glBindVertexArray anyways so we generally don't unbind VAOs (nor VBOs) when it's not directly necessary.
+					glBindVertexArray(0);
+
+					glActiveTexture(GL_TEXTURE0);
+					glBindTexture(GL_TEXTURE_2D, texture1);
+					glActiveTexture(GL_TEXTURE1);
+					glBindTexture(GL_TEXTURE_2D, texture2);
+					prog["texture1"] = 0;
+					prog["texture2"] = 1;
+					prog["light_pos"] = light_pos;
+					prog["object_color"] = object_color;
+					prog["vs"] = vs;
+					prog["inv"] = glm::inverse(vp);
+					prog["ww"] = display_w;
+					prog["wh"] = display_h;
+					prog["near"] = myNear;
+					prog["far"] = myFar;
+					prog["bling_phong"] = static_cast<int>(bling_phong);
+					prog.use();
+					glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
+					glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+				}
+
+				std::vector<unsigned char> raw_data(display_w * display_h * 3);
+				glReadPixels(0, 0, display_w, display_h, GL_RGB, GL_UNSIGNED_BYTE, raw_data.data());
+				std::vector<unsigned char> raw_data2(raw_data.size() * 4 / 3);
+				for (int i = 0; i < display_h; ++i) {
+					for (int j = 0; j < display_w; ++j) {
+						raw_data2[(i * display_w + j) * 4 + 0] = raw_data[(i * display_w + j) * 3 + 0];
+						raw_data2[(i * display_w + j) * 4 + 1] = raw_data[(i * display_w + j) * 3 + 1];
+						raw_data2[(i * display_w + j) * 4 + 2] = raw_data[(i * display_w + j) * 3 + 2];
+						raw_data2[(i * display_w + j) * 4 + 3] = 255;
+					}
+				}
+
+				char temp[100];
+				static int fileCount = 0;
+				sprintf(temp, "result%d.png", fileCount++);
+				outputPng(temp, raw_data2, display_w, display_h);
+
+				glDisable(GL_DEPTH_TEST);
+				glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			}
 
 			glDisable(GL_DEPTH_TEST);
@@ -422,9 +536,13 @@ int main(void)
 				ImGui::SliderFloat("degree", &degree, 0.0f, 360.0f);			 // Edit 1 float using a slider from 0.0f to 1.0f
 				ImGui::ColorEdit3("clear color", (float *)&clear_color);		 // Edit 3 floats representing a color
 				ImGui::ColorEdit3("object color", glm::value_ptr(object_color)); // Edit 3 floats representing a color
+				ImGui::SliderFloat3("camera position", glm::value_ptr(cameraPos), -100, 100);
 				ImGui::SliderFloat3("Position", glm::value_ptr(light_pos), -10, 10);
 
 				ImGui::Checkbox("Bling Phong", &bling_phong);
+				if (ImGui::Button("Do Blur")) {
+					doBlur = true;
+				}
 				ImGui::Image(reinterpret_cast<ImTextureID>(text.id()), ImVec2{ 128, 128 });
 				//ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", deltaTime, 1 / deltaTime);
@@ -437,7 +555,7 @@ int main(void)
 
 			glfwSwapBuffers(window);
 			glfwPollEvents();
-			}
+		}
 
 #if CREATE_PNG == 1
 		while (threadVec.size() != 0) {
@@ -452,8 +570,8 @@ int main(void)
 		}
 #endif
 		glDeleteFramebuffers(1, &fbo);
-		}
+	}
 	glfwDestroyWindow(window);
 	glfwTerminate();
 	exit(EXIT_SUCCESS);
-		}
+}

@@ -28,7 +28,7 @@ public:
 	static constexpr float k = 1.38672255f;	// Constant used to calculate interaction force
 	static constexpr float viscosity = 0.1f;  // Viscosity == mu
 	static constexpr float mass = 1.0f;		// Mass of each particle (Assume each particle is same)
-	static constexpr float radii = 0.75f; 			// Radii (radius of affect)
+	static constexpr float radii = 0.6f; 			// Radii (radius of affect)
 	static constexpr float rDensity = 3.0f;		// Refrence Density
 
 	static constexpr int steps = 5;				// Amount of steps used in Leap From Integration
